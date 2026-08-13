@@ -14,6 +14,23 @@ EXPORTS_DIR = DATA_DIR / "exports"
 
 WEB_DIR = BASE_DIR / "web"
 
+# Predlozi za nadogradnju aplikacije. Za razliku od data/, ovo JESTE u gitu -
+# to je i poenta: predlog se nosi u Claude i zavrsi kao izmena koda.
+PROPOSALS_DIR = BASE_DIR / "predlozi"
+CONTEXT_FILE = PROPOSALS_DIR / "KONTEKST-ZA-AI.md"
+
+
+def use_proposals_dir(path) -> None:
+    """Premesti folder sa predlozima.
+
+    Odvojeno od `use_data_dir`, jer `predlozi/` nije korisnicki podatak nego deo
+    repozitorijuma. Postoji da testovi ne bi pisali u pravi folder projekta.
+    """
+    global PROPOSALS_DIR, CONTEXT_FILE
+    PROPOSALS_DIR = Path(path).resolve()
+    CONTEXT_FILE = PROPOSALS_DIR / "KONTEKST-ZA-AI.md"
+    PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
+
 
 def use_data_dir(path) -> None:
     """Premesti sve podatke u drugi folder.
@@ -63,3 +80,6 @@ def ensure_dirs() -> None:
 
 if os.environ.get("SKRIPTA_DATA_DIR"):
     use_data_dir(os.environ["SKRIPTA_DATA_DIR"])
+
+if os.environ.get("SKRIPTA_PROPOSALS_DIR"):
+    use_proposals_dir(os.environ["SKRIPTA_PROPOSALS_DIR"])

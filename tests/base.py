@@ -18,7 +18,9 @@ from pathlib import Path
 
 from app import config, db
 
-PROJECT_DATA_DIR = (Path(__file__).resolve().parent.parent / "data").resolve()
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_DATA_DIR = (PROJECT_ROOT / "data").resolve()
+PROJECT_PROPOSALS_DIR = (PROJECT_ROOT / "predlozi").resolve()
 
 _TABLES = (
     "attempt", "session_skip", "study_session", "explanation_cache",
@@ -33,6 +35,10 @@ def _assert_safe() -> None:
         raise AssertionError(
             "Testovi pokazuju na pravi data/ folder. Prekidam pre nego sto obrisem podatke."
         )
+    if config.PROPOSALS_DIR.resolve() == PROJECT_PROPOSALS_DIR:
+        raise AssertionError(
+            "Testovi pokazuju na pravi predlozi/ folder. Prekidam pre nego sto ga zatrpam."
+        )
 
 
 class AppTestCase(unittest.TestCase):
@@ -41,6 +47,7 @@ class AppTestCase(unittest.TestCase):
         cls._temp_dir = tempfile.mkdtemp(prefix="skripta-test-")
         db.close_thread_connection()
         config.use_data_dir(cls._temp_dir)
+        config.use_proposals_dir(Path(cls._temp_dir) / "predlozi")
         _assert_safe()
         db.init_db()
 
@@ -53,6 +60,13 @@ class AppTestCase(unittest.TestCase):
         _assert_safe()
         for table in _TABLES:
             db.execute(f"DELETE FROM {table}")
+
+        # Predlozi su fajlovi, ne redovi - baza ih ne cisti. Brisu se ciljano
+        # (`predlog-*.md`), da mapa projekta ostane i ne mora da se regenerise
+        # pred svaki test.
+        if config.PROPOSALS_DIR.is_dir():
+            for path in config.PROPOSALS_DIR.glob("predlog-*.md"):
+                path.unlink()
 
     # -------------------------------------------------------------- fixtures
 

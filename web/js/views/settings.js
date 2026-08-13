@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { el, mount, field, toast, when } from '../dom.js';
 import { store, saveSettings } from '../store.js';
 import * as tts from '../tts.js';
+import { networkCard } from './network.js';
 
 export async function settings(root) {
   const values = store.settings;
@@ -243,6 +244,8 @@ export async function settings(root) {
         ]),
       ]),
     ]),
+
+    await networkCard(),
 
     el('div', { class: 'card' }, [
       el('div', { class: 'card__head' }, ['Potrošnja AI poziva']),

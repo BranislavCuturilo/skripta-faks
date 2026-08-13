@@ -21,12 +21,19 @@ Za AI funkcije treba ti besplatan **Gemini API kljuc**
 
 Dupli klik na `START.bat`. Otvorice se browser na `http://localhost:8077`.
 
-U konzoli pise i adresa za telefon (npr. `http://192.168.1.12:8077`) — otvoris je
-na telefonu koji je na istom Wi-Fi-ju i mozes da slikas zadatak i posaljes ga
-direktno u aplikaciju.
-
 Da napravis ikonicu na desktopu: desni klik na `START.bat` → Send to → Desktop
 (create shortcut).
+
+## Ucenje sa telefona
+
+Adresa za telefon pise na **pocetnom ekranu aplikacije** (kartica *Otvori na
+telefonu*) i u konzoli pri pokretanju — npr. `http://192.168.1.12:8077`.
+
+Telefon mora da bude na istom Wi-Fi-ju. Time dobijas i tip zadatka „Uradi
+zadatak": resis na papiru, slikas telefonom, i AI proverava postupak.
+
+Ako je ponudjeno vise adresa, probaj onu bez napomene — one oznacene kao
+*VirtualBox*, *WSL* ili *VPN* skoro sigurno nisu tvoj Wi-Fi.
 
 ## Gde su podaci
 
@@ -37,7 +44,26 @@ Sve je u folderu `data/`:
 
 `data/` je van gita. Bekap = kopiraj taj folder.
 
+## Ako ti aplikacija ne radi ono sto ti treba
+
+Ne moras sam da pises kod. Tab **Predlozi** u aplikaciji: opises svojim recima
+sta ti fali, Gemini to prevede u konkretan nalog (koji fajlovi se diraju, sta se
+menja, sta ne sme da se pokvari), i taj nalog odneses placenom AI asistentu koji
+ume da napise kod.
+
+Vidi [predlozi/README.md](predlozi/README.md).
+
 ## Dokumentacija
 
+- [docs/UPUTSTVO.md](docs/UPUTSTVO.md) — **od nule do prve sesije**: Gemini kljuc,
+  podesavanja, materijali, ucenje, telefon, resavanje problema
 - [docs/PLAN.md](docs/PLAN.md) — plan izgradnje, faze i odluke
 - [docs/ARHITEKTURA.md](docs/ARHITEKTURA.md) — kako je sastavljeno i zasto
+- [predlozi/README.md](predlozi/README.md) — kako se aplikacija nadogradjuje
+
+## Za programere
+
+```
+python run_tests.py     # ceo test suite (156 testova, bez pytest-a)
+python mapa.py          # regenerise predlozi/KONTEKST-ZA-AI.md iz koda
+```

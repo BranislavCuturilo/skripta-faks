@@ -14,7 +14,7 @@ for stream in (sys.stdout, sys.stderr):
     if hasattr(stream, "reconfigure"):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
-from app import config, db, server  # noqa: E402  - uvoz servera registruje i rute
+from app import config, db, netinfo, server  # noqa: E402  - uvoz servera registruje i rute
 
 
 BANNER = r"""
@@ -37,17 +37,23 @@ def main() -> int:
     print(f"  Baza: {config.DB_PATH}")
 
     port = server.find_free_port(config.DEFAULT_PORT, config.PORT_SEARCH_RANGE)
-    local_url = f"http://localhost:{port}"
-    phone_url = f"http://{server.lan_address()}:{port}"
+    httpd = server.build(port)
+    network = netinfo.info(port)
+    local_url = network["local_url"]
 
     print()
     print(f"  Na ovom racunaru : {local_url}")
-    print(f"  Na telefonu      : {phone_url}   (isti Wi-Fi)")
+    if network["addresses"]:
+        print(f"  Na telefonu      : {network['phone_url']}   (isti Wi-Fi)")
+        for item in network["addresses"][1:]:
+            note = f"   ({item['hint']})" if item["hint"] else ""
+            print(f"                     {item['url']}{note}")
+    else:
+        print("  Na telefonu      : nema mrezne adrese - racunar nije na mrezi")
     print()
+    print("  Iste adrese pisu i u aplikaciji, na pocetnom ekranu.")
     print("  Zaustavljanje: Ctrl+C, ili samo zatvori ovaj prozor.")
     print("-" * 64)
-
-    httpd = server.build(port)
     threading.Timer(0.8, lambda: webbrowser.open(local_url)).start()
 
     try:

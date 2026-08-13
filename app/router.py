@@ -96,6 +96,10 @@ class Router:
             raise HttpError(405, f"Metoda {method} nije dozvoljena za {path}.", sorted(allowed))
         raise HttpError(404, f"Ruta ne postoji: {path}")
 
+    def entries(self) -> list[Route]:
+        """Sve registrovane rute - za mapu projekta i za dijagnostiku."""
+        return list(self._routes)
+
     def __len__(self) -> int:
         return len(self._routes)
 

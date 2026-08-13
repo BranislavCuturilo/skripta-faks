@@ -272,6 +272,72 @@ Vrati iskljucivo:
 {{"title": "naslov dopune", "body": "tekst u markdownu"}}"""
 
 
+SYSTEM_PROPOSAL = """\
+Ti si iskusan programer koji nekome pomaze da nadogradi aplikaciju koju koristi, \
+a nije je pisao.
+
+Dobijas mapu projekta i zahtev korisnika napisan svojim recima. Tvoj posao NIJE \
+da napises kod - nego da zahtev prevedes u nalog koji drugi AI asistent moze da \
+izvrsi bez nagadjanja: sta se tacno menja, u kojim fajlovima, i sta ne sme da se \
+pokvari.
+
+Pravila:
+1. Predlazes SAMO ono sto se uklapa u navedena pravila projekta. Ako zahtev trazi \
+spoljnu biblioteku, kazi to otvoreno i ponudi resenje standardnom bibliotekom, \
+ili jasno napisi da ovo menja osnovnu odluku projekta.
+2. Pominjes samo fajlove koji stvarno postoje u mapi. Ne izmisljas putanje.
+3. Ako zahtev dira vise mesta koja moraju da se menjaju zajedno (npr. novi tip \
+pitanja trazi izmenu na tri mesta) - navodis sva tri.
+4. Ako je zahtev nejasan, ne pogadjas: u 'pitanja' upisujes sta treba da se \
+razjasni pre pocetka.
+5. 'claude_brief' je tekst koji korisnik doslovno kopira u placenog AI asistenta. \
+Pisan je asistentu, ne korisniku, i sam po sebi je dovoljan.
+
+Odgovaras iskljucivo JSON-om, bez ijedne reci van JSON-a.\
+"""
+
+
+def build_proposal_prompt(*, context: str, request: str, usage: str, language: str = "sr") -> str:
+    return f"""\
+JEZIK ODGOVORA: {_language_name(language)}
+
+{"=" * 60}
+MAPA PROJEKTA
+{"=" * 60}
+{context}
+
+{"=" * 60}
+KAKO KORISNIK KORISTI APLIKACIJU
+{"=" * 60}
+{usage}
+
+{"=" * 60}
+ZAHTEV KORISNIKA (njegovim recima)
+{"=" * 60}
+{request}
+
+{"=" * 60}
+
+Vrati iskljucivo ovaj JSON:
+{{
+  "title": "kratak naslov predloga",
+  "understood": "sta si razumeo da korisnik zeli, njegovim recnikom",
+  "feasible": true,
+  "breaks_rules": "",
+  "approach": "kako bi se to uradilo, u 3-6 recenica",
+  "files": [
+    {{"path": "app/quiz/types.py", "change": "sta se tu tacno menja"}}
+  ],
+  "must_not_break": ["sta mora da nastavi da radi isto"],
+  "questions": ["sta treba razjasniti pre pocetka, ako ista"],
+  "effort": "mali",
+  "claude_brief": "ceo nalog za AI asistenta, spreman za kopiranje"
+}}
+- feasible je false ako se ovo ne moze uraditi bez krsenja pravila projekta.
+- breaks_rules popunjavas samo ako zahtev zaista krsi neko pravilo - napisi koje.
+- effort je "mali", "srednji" ili "veliki"."""
+
+
 def export_bundle(system: str, prompt: str, purpose: str = "generisanje pitanja") -> str:
     """Ceo poziv kao tekst za lepljenje u drugi model."""
     return f"""\

@@ -88,6 +88,42 @@ class HttpTestCase(AppTestCase):
         self.fail(f"posao {job_id} nije zavrsio u {timeout}s")
 
 
+class PortProbeTests(AppTestCase):
+    """Provera slobodnog porta koja uvek kaze "slobodno" nije provera.
+
+    Na Windows-u SO_REUSEADDR dozvoljava dvema aplikacijama da slusaju isti
+    port; kad je probni soket imao tu opciju, server se tiho delio sa tudjim
+    procesom i deo zahteva je odlazio njemu. Zato se ovde port NAMERNO zauzme.
+    """
+
+    def test_taken_port_is_skipped(self):
+        import socket as socket_module
+
+        from app import server as server_module
+
+        taken = server_module.find_free_port(8850, 40)
+        holder = socket_module.socket(socket_module.AF_INET, socket_module.SOCK_STREAM)
+        try:
+            holder.bind(("0.0.0.0", taken))
+            holder.listen(1)
+            chosen = server_module.find_free_port(taken, 40)
+            self.assertNotEqual(chosen, taken, "zauzet port je prijavljen kao slobodan")
+            self.assertGreater(chosen, taken)
+        finally:
+            holder.close()
+
+    def test_free_port_is_returned(self):
+        from app import server as server_module
+
+        self.assertGreaterEqual(server_module.find_free_port(8850, 40), 8850)
+
+    def test_no_free_port_raises(self):
+        from app import server as server_module
+
+        with self.assertRaises(RuntimeError):
+            server_module.find_free_port(80, 0)
+
+
 class BasicRoutingTests(HttpTestCase):
     def test_health(self):
         payload = self.call("GET", "/api/health")

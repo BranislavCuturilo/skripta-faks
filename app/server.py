@@ -4,15 +4,14 @@ Aplikacija je JSON API + staticka SPA ljuska. Nema template engine-a jer nema
 zavisnosti: server servira `web/`, a renderovanje radi browser.
 """
 
-import json
+import os
 import socket
-import sys
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from . import config, db
+from . import config, db, netinfo
 from .http_util import (
     HttpError,
     Request,
@@ -194,38 +193,44 @@ class Handler(BaseHTTPRequestHandler):
 
 class Server(ThreadingHTTPServer):
     daemon_threads = True
-    allow_reuse_address = True
+    # NIKAD True na Windows-u. Tamo SO_REUSEADDR ne znaci "preuzmi port koji je
+    # u TIME_WAIT" kao na Unix-u, nego "dozvoli i drugom procesu da slusa na
+    # istom portu". Posledica: dve aplikacije tiho dele port i zahtevi odlaze
+    # cas jednoj cas drugoj. Izgleda kao pokvaren ruter, a nije.
+    allow_reuse_address = os.name != "nt"
 
     def shutdown_request(self, request) -> None:  # noqa: D102
         super().shutdown_request(request)
         db.close_thread_connection()
 
 
+def lan_address() -> str:
+    """Zadrzano zbog run.py; pravi posao je u netinfo."""
+    return netinfo.lan_address()
+
+
 def find_free_port(preferred: int, attempts: int) -> int:
+    """Prvi port koji STVARNO niko ne drzi.
+
+    Probni soket namerno NEMA SO_REUSEADDR: sa njim `bind` na Windows-u uspeva i
+    kad port vec neko koristi, pa bi provera uvek govorila "slobodno" i server
+    bi se tiho podelio sa tudjom aplikacijom.
+    """
     for offset in range(attempts):
         candidate = preferred + offset
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if os.name == "nt":
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
             try:
                 probe.bind(("0.0.0.0", candidate))
+                probe.listen(1)
             except OSError:
                 continue
         return candidate
     raise RuntimeError(
-        f"Nema slobodnog porta u opsegu {preferred}-{preferred + attempts - 1}."
+        f"Nema slobodnog porta u opsegu {preferred}-{preferred + attempts - 1}. "
+        "Zatvori aplikaciju koja ih drzi, ili promeni DEFAULT_PORT u app/config.py."
     )
-
-
-def lan_address() -> str:
-    """IP koji telefon na istom Wi-Fi-ju moze da otvori."""
-    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        probe.connect(("8.8.8.8", 80))
-        return probe.getsockname()[0]
-    except OSError:
-        return "127.0.0.1"
-    finally:
-        probe.close()
 
 
 def build(port: int, host: str = "0.0.0.0") -> Server:
@@ -234,4 +239,5 @@ def build(port: int, host: str = "0.0.0.0") -> Server:
     Testovi prosledjuju 127.0.0.1 da Windows ne bi pitao za dozvolu firewall-a
     na svakom pokretanju suite-a.
     """
+    netinfo.RUNNING_PORT = port
     return Server((host, port), Handler)

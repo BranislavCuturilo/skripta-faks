@@ -25,6 +25,7 @@ sys.path.insert(0, str(BASE_DIR))
 os.environ["SKRIPTA_BLOCK_NETWORK"] = "1"
 _TEMP_DIR = tempfile.mkdtemp(prefix="skripta-suite-")
 os.environ["SKRIPTA_DATA_DIR"] = _TEMP_DIR
+os.environ["SKRIPTA_PROPOSALS_DIR"] = str(Path(_TEMP_DIR) / "predlozi")
 
 
 def module_names() -> list[str]:

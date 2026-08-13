@@ -1,6 +1,6 @@
 """Zdravlje aplikacije i jedan poziv koji browser radi na startu."""
 
-from .. import __version__, db
+from .. import __version__, db, netinfo
 from ..http_util import Request, Response, json_response
 from ..quiz import types as question_types
 from ..router import router
@@ -23,8 +23,19 @@ def bootstrap(request: Request) -> Response:
             "tree": categories.tree(),
             "question_types": question_types.catalog(),
             "stats": _global_stats(),
+            "network": netinfo.info(),
         }
     )
+
+
+@router.get("/api/network")
+def network(request: Request) -> Response:
+    """Adrese pod kojima je app dostupan - za 'otvori na telefonu'.
+
+    Racuna se na svaki poziv, a ne jednom na startu: Wi-Fi se menja, laptop
+    prelazi sa kabla na bezicnu, VPN se pali i gasi.
+    """
+    return json_response({"ok": True, "network": netinfo.info()})
 
 
 def _global_stats() -> dict:

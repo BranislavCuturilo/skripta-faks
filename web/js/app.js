@@ -10,6 +10,9 @@ import { overview, materials, generate } from './views/category.js';
 import { questions, strategy, notes } from './views/library.js';
 import { settings } from './views/settings.js';
 import { studySetup, runSession } from './views/study.js';
+import { guide } from './views/guide.js';
+import { proposals } from './views/proposals.js';
+import { networkCard } from './views/network.js';
 
 const TABS = [
   ['pregled', 'Pregled'],
@@ -148,12 +151,18 @@ async function route() {
   const parts = hash.split('/').filter(Boolean);
   closeMenu();
 
-  if (parts[0] === 'podesavanja') {
+  const standalone = {
+    podesavanja: ['Podešavanja', '', settings],
+    uputstvo: ['Uputstvo', 'od nule do prve sesije', guide],
+    predlozi: ['Predlozi za nadogradnju', 'kad ti aplikacija ne radi ono što ti treba', proposals],
+  };
+  if (standalone[parts[0]]) {
+    const [title, subtitle, screen] = standalone[parts[0]];
     store.categoryId = null;
     drawTree();
-    setTitle('Podešavanja', '');
+    setTitle(title, subtitle);
     mount($('#topbar-actions'));
-    return settings(view());
+    return screen(view());
   }
 
   if (parts[0] === 'k' && parts[1]) {
@@ -250,6 +259,8 @@ async function home() {
       tile(stats.due_now, 'na redu sada', 'due'),
     ]),
 
+    await networkCard({ compact: store.tree.length > 0 }),
+
     flat.length
       ? el('div', { class: 'card' }, [
           el('div', { class: 'card__head' }, ['Na redu za ponavljanje']),
@@ -280,6 +291,8 @@ async function home() {
             el('div', { class: 'btn-row mt2' }, [
               el('button', { class: 'btn btn--primary', text: '+ Napravi prvi predmet',
                              onClick: () => newCategory(null) }),
+              el('button', { class: 'btn', text: '❓ Detaljno uputstvo',
+                             onClick: () => { location.hash = '#/uputstvo'; } }),
               el('button', { class: 'btn', text: '⚙ Podešavanja',
                              onClick: () => { location.hash = '#/podesavanja'; } }),
             ]),
@@ -324,6 +337,8 @@ function closeMenu() {
 async function start() {
   $('#new-category').onclick = () => newCategory(null);
   $('#open-settings').onclick = () => { location.hash = '#/podesavanja'; };
+  $('#open-guide').onclick = () => { location.hash = '#/uputstvo'; };
+  $('#open-proposals').onclick = () => { location.hash = '#/predlozi'; };
   $('#menu-toggle').onclick = () => {
     $('#sidebar').classList.contains('is-open') ? closeMenu() : openMenu();
   };
