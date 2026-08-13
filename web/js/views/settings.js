@@ -14,7 +14,10 @@ export async function settings(root) {
   // ------------------------------------------------------------ AI ključ
 
   const keyInput = el('input', {
-    type: 'password', placeholder: values.gemini_api_key_set ? '••••••••••••' : 'AIza...',
+    type: 'password',
+    // Ne pisati "AIza..." kao placeholder: u proporcionalnom fontu veliko I
+    // izgleda kao malo L, pa ljudi kucaju "Alza".
+    placeholder: values.gemini_api_key_set ? '••••••••••••' : 'nalepi ključ ovde',
     autocomplete: 'off',
   });
   const keyStatus = el('div', {
@@ -51,32 +54,89 @@ export async function settings(root) {
     store.settings = payload.settings;
   }
 
-  async function loadModels() {
-    if (!store.settings.gemini_api_key_set) {
-      mount(modelBox, el('div', { class: 'muted small', text: 'Unesi ključ pa biraj modele.' }));
-      return;
-    }
-    mount(modelBox, el('div', { class: 'flex' }, [el('div', { class: 'spinner' }), 'Učitavam modele...']));
+  const TIERS = [
+    ['fast', 'model_fast', 'Brz i jeftin', 'Za sitne poslove — najmanje troši kvotu.'],
+    ['standard', 'model_standard', 'Standardni', 'Generisanje pitanja i ocenjivanje.'],
+    ['strong', 'model_strong', 'Najjači', 'Foto-zadaci, teško ocenjivanje, predlozi za nadogradnju.'],
+    ['tts', 'model_tts', 'Glas', 'Koristi se samo ako je izgovor podešen na Gemini glas.'],
+  ];
+
+  async function loadModels(refresh = false) {
+    mount(modelBox, el('div', { class: 'flex' }, [
+      el('div', { class: 'spinner' }), refresh ? 'Pitam Google šta je dostupno...' : 'Učitavam...',
+    ]));
 
     let payload;
     try {
-      payload = await api.get('/api/models');
+      payload = refresh
+        ? await api.post('/api/models/refresh', {})
+        : await api.get('/api/models');
     } catch (error) {
       mount(modelBox, el('div', { class: 'muted small', text: error.message }));
       return;
     }
 
-    const options = payload.models || [];
-    const picker = (key, label, hint) => field(label, el('select', {
-      onChange: (event) => saveSettings({ [key]: event.target.value }).then(() => toast('Sačuvano', 'good')),
-    }, options.map((model) => el('option', {
-      value: model.name, text: model.label, selected: model.name === store.settings[key],
-    }))), hint);
+    const list = payload.models || [];
+    const byTier = Object.fromEntries((payload.status?.tiers || []).map((item) => [item.tier, item]));
+    store.models = payload.status || store.models;
+
+    if (refresh && (payload.changes || []).length) {
+      for (const change of payload.changes) {
+        toast(`${change.tier}: ${change.from} → ${change.to}`, 'good');
+      }
+    }
+
+    const picker = ([tier, key, label, hint]) => {
+      const info = byTier[tier] || {};
+      const options = [
+        el('option', {
+          value: '',
+          selected: !info.manual,
+          text: `Automatski${info.model ? ` — sada: ${info.model}` : ''}`,
+        }),
+        ...list.map((name) => el('option', {
+          value: name, text: name, selected: info.manual && info.model === name,
+        })),
+      ];
+
+      return el('div', { class: 'field' }, [
+        el('span', { class: 'field__label' }, [
+          label,
+          info.retired ? el('span', { class: 'badge badge--bad', text: 'penzionisan' }) : null,
+          info.missing ? el('span', { class: 'badge badge--warn', text: 'nema ga na tvom ključu' }) : null,
+        ]),
+        el('select', {
+          onChange: async (event) => {
+            await saveSettings({ [key]: event.target.value });
+            toast('Sačuvano', 'good');
+            loadModels();
+          },
+        }, options),
+        el('div', { class: 'field__hint', text: hint }),
+      ]);
+    };
 
     mount(modelBox,
-      picker('model_fast', 'Brz i jeftin', 'Za sitne poslove — najmanje troši kvotu.'),
-      picker('model_standard', 'Standardni', 'Generisanje pitanja i ocenjivanje.'),
-      picker('model_strong', 'Najjači', 'Foto-zadaci i teško ocenjivanje.'));
+      el('div', { class: 'small muted mb2' }, [
+        'Nazivi Gemini modela se menjaju — aplikacija ih zato ne drži tvrdo upisane nego bira ',
+        'iz spiska koji vrati tvoj ključ. Ostavi „Automatski" i sam će preći na noviji kad ovaj ',
+        'bude penzionisan.',
+      ]),
+      ...TIERS.map(picker),
+      el('div', { class: 'btn-row mt1' }, [
+        el('button', { class: 'btn', text: '⟳ Osveži spisak modela',
+                       onClick: () => loadModels(true) }),
+        el('span', { class: 'tiny faint',
+                     text: payload.status?.checked_at
+                       ? `${payload.status.available_count} dostupnih · provereno ${when(payload.status.checked_at)}`
+                       : 'spisak još nije učitan sa tvog ključa' }),
+      ]),
+      !payload.key_set && !list.length
+        ? el('div', { class: 'field__hint mt1',
+                      text: 'Unesi ključ pa pritisni „Osveži spisak" — dok toga nema, koriste se ' +
+                            'podrazumevani nazivi i poziv može da padne ako su penzionisani.' })
+        : null,
+    );
   }
 
   // ------------------------------------------------------------ govor
@@ -165,9 +225,15 @@ export async function settings(root) {
       el('div', { class: 'card__body' }, [
         el('div', { class: 'small muted mb1' }, [
           'Ključ uzimaš na ',
-          el('a', { href: 'https://aistudio.google.com/apikey', target: '_blank',
-                    rel: 'noopener', text: 'aistudio.google.com/apikey' }),
+          el('a', { href: 'https://aistudio.google.com/api-keys', target: '_blank',
+                    rel: 'noopener', text: 'aistudio.google.com/api-keys' }),
           '. Čuva se u tvojoj lokalnoj bazi i ne šalje se nigde osim Google-u.',
+        ]),
+        el('div', { class: 'field__hint mb1' }, [
+          el('strong', { text: 'Stariji ključ prestao da radi? ' }),
+          'Google gasi stari tip ključa („standard") — svi prestaju da rade tokom septembra 2026. ',
+          'Napravi novi na linku iznad; novi su automatski „auth" i rade dalje. ',
+          'Pitanja i napredak ostaju.',
         ]),
         field('Gemini API ključ', keyInput),
         keyStatus,

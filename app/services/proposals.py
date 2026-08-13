@@ -21,7 +21,7 @@ from pathlib import Path
 from .. import config, db
 from ..ai import contract, gemini, prompts
 from ..http_util import HttpError
-from . import settings_store
+from . import ai_models, settings_store
 
 FILE_PATTERN = re.compile(r"^predlog-(\d{4})-(.+)\.md$")
 
@@ -101,15 +101,15 @@ def create(request_text: str) -> dict:
     if not api_key:
         raise HttpError(400, "Nije unet Gemini API ključ. Podešavanja → AI.")
 
-    result = gemini.generate(
-        api_key,
-        settings_store.get("model_strong"),
+    result = ai_models.generate(
+        "strong",
         prompts.build_proposal_prompt(
             context=context_text(),
             request=request_text,
             usage=_usage_summary(),
             language=settings_store.get("ui_language", "sr"),
         ),
+        api_key=api_key,
         system=prompts.SYSTEM_PROPOSAL,
         json_output=True,
         temperature=0.4,

@@ -17,17 +17,15 @@ from typing import Any, Optional
 from .. import config, db
 from ..ai import contract, gemini, prompts
 from ..http_util import HttpError
-from . import categories, materials, questions, settings_store, strategy
+from . import ai_models, categories, materials, questions, settings_store, strategy
 from .jobs import Job
 
 # Koliko originalnih fajlova ide u jedan poziv - vise od ovoga i zahtev pukne.
 FILES_PER_CALL = 4
 
-MODEL_TIERS = {"fast": "model_fast", "standard": "model_standard", "strong": "model_strong"}
-
-
 def resolve_model(tier: str) -> str:
-    return settings_store.get(MODEL_TIERS.get(tier, "model_standard"))
+    """Naziv se ne cita iz konstante nego se razresava - vidi services/ai_models.py."""
+    return ai_models.for_tier(tier)
 
 
 def plan(category_id: int, options: Optional[dict] = None) -> dict:
@@ -292,16 +290,23 @@ def _one_call(
     summary["calls"] += 1
 
     try:
-        result = gemini.generate(
-            api_key,
-            model,
+        result = ai_models.generate(
+            options["tier"],
             prompt,
+            api_key=api_key,
+            model=model,
             system=system,
             files=files,
             json_output=True,
             temperature=options["temperature"],
             purpose="generate_questions",
         )
+        if result.get("model_switched"):
+            switch = result["model_switched"]
+            db.update("generation_run", run_id, {"model": switch["to"]})
+            summary["errors"].append(
+                f"Model '{switch['from']}' više nije dostupan — prešao sam na '{switch['to']}'."
+            )
     except gemini.AiError as exc:
         db.update("generation_run", run_id, {"status": "failed", "error": exc.message,
                                              "finished_at": _now()})

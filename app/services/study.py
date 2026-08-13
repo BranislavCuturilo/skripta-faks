@@ -15,7 +15,7 @@ from ..ai import gemini, prompts
 from ..http_util import HttpError
 from ..quiz import grading, scheduler
 from ..quiz import types as question_types
-from . import categories, questions, settings_store, strategy
+from . import ai_models, categories, questions, settings_store, strategy
 
 
 def start(category_id: int, options: Optional[dict] = None) -> dict:
@@ -281,7 +281,7 @@ def _ask_ai(question: dict, answer_text: str, given: dict) -> Optional[dict]:
             files = [{"path": str(full), "mime_type": ""}]
 
     kind = question_types.get(question["type"]).grading
-    tier = "model_strong" if kind == "ai" and photo_path else "model_standard"
+    tier = "strong" if kind == "ai" and photo_path else "standard"
 
     prompt = prompts.build_grading_prompt(
         question_type=question["type"],
@@ -292,10 +292,10 @@ def _ask_ai(question: dict, answer_text: str, given: dict) -> Optional[dict]:
         has_photo=bool(photo_path),
     )
     try:
-        result = gemini.generate(
-            api_key,
-            settings_store.get(tier),
+        result = ai_models.generate(
+            tier,
             prompt,
+            api_key=api_key,
             system=prompts.SYSTEM_GRADE,
             files=files,
             json_output=True,
@@ -304,6 +304,8 @@ def _ask_ai(question: dict, answer_text: str, given: dict) -> Optional[dict]:
             purpose="grade",
         )
     except gemini.AiError:
+        # Ocenjivanje ne sme da obori odgovor: pozivalac tada prikaze tacan
+        # odgovor i kaze da automatska provera nije uspela.
         return None
 
     from ..ai import contract

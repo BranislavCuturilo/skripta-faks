@@ -14,9 +14,16 @@ from .. import db
 DEFAULTS: dict[str, Any] = {
     "gemini_api_key": "",
     "provider": "gemini",
-    "model_fast": "gemini-2.5-flash-lite",
-    "model_standard": "gemini-2.5-flash",
-    "model_strong": "gemini-2.5-pro",
+    # Prazno = automatski. Naziv modela se NE upisuje ovde tvrdo: Google ih
+    # penzionise, a aplikacija koja nosi zamrznut naziv jednog dana prestane da
+    # radi bez objasnjenja. Izbor pravi `services/ai_models.py` iz spiska koji
+    # vrati sam kljuc; ovde zavrsi tek kad je razresen ili rucno izabran.
+    "model_fast": "",
+    "model_standard": "",
+    "model_strong": "",
+    "model_tts": "",
+    "models_available": "[]",
+    "models_checked_at": "",
     "ui_language": "sr",
     "question_language": "sr",
     # 1 = opusteno ("moze po nesto i da ne znam"), 5 = "moram sve da znam"

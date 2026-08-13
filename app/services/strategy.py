@@ -14,7 +14,7 @@ from typing import Any, Optional
 from .. import db
 from ..ai import contract, gemini, prompts
 from ..http_util import HttpError
-from . import categories, settings_store
+from . import ai_models, categories, settings_store
 
 KIND_GENERATION = "generation"
 
@@ -236,7 +236,6 @@ def refresh(category_id: int, min_attempts: int = 15) -> dict:
         }
 
     api_key = settings_store.get("gemini_api_key", "")
-    model = settings_store.get("model_standard")
     path = " / ".join(node["name"] for node in categories.breadcrumb(category_id))
 
     prompt = prompts.build_strategy_prompt(
@@ -244,10 +243,10 @@ def refresh(category_id: int, min_attempts: int = 15) -> dict:
         evidence=data,
         language=settings_store.get("ui_language", "sr"),
     )
-    result = gemini.generate(
-        api_key,
-        model,
+    result = ai_models.generate(
+        "standard",
         prompt,
+        api_key=api_key,
         system="Ti si metodicar koji podesava nacin ispitivanja. Odgovaras iskljucivo JSON-om.",
         json_output=True,
         temperature=0.4,

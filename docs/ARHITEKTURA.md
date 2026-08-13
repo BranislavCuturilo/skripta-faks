@@ -98,6 +98,30 @@ Kad odgovor bude odsečen na `MAX_TOKENS`, `contract._salvage` iz nepotpunog JSO
 izvlači sve cele objekte. Bolje 18 upotrebljivih pitanja nego nijedno zato što
 je 19. presečeno.
 
+### Nazivi modela se ne upisuju tvrdo
+
+Prva verzija je nosila `gemini-2.5-flash` i drugove kao podrazumevane vrednosti.
+Google ih je penzionisao, a odvojeno od toga počeo i da gasi stari tip API
+ključa — i aplikacija je prestala da radi uz poruku koja korisniku nije značila
+ništa.
+
+Zato `app/ai/models.py` ne drži jedan naziv nego **redosled želja po nivou**
+(brz / standardni / najjači / glas), a `app/services/ai_models.py` pravi izbor
+u toku rada:
+
+1. uzmi prvi iz liste želja koji korisnikov ključ **stvarno ima** (`ListModels`)
+2. ako nijedan ne postoji — Google je opet preimenovao familiju — biraj
+   heuristikom iz onoga što postoji: najveća verzija, pa odgovarajući oblik
+   (`lite` za brzi, `pro` za najjači, slike i ugrađivanja se izbacuju)
+
+Drugi korak je ono zbog čega ovo preživljava **sledeće** preimenovanje, i pinovan
+je testom na izmišljenoj `gemini-4.2` familiji u kojoj nijedan naziv nije poznat.
+
+Uz to, `ai_models.generate()` na grešku „model ne postoji" jednom osveži spisak,
+prepravi izbor i ponovi poziv — pa se penzionisanje vidi kao obaveštenje, ne kao
+kvar. Ručni izbor korisnika se poštuje, osim kad model nestane ili je iz familije
+koja se gasi; tada se menja i **prijavi**.
+
 ### AI se zove samo kad mora
 
 Sve što se može proveriti lokalno — proverava se lokalno (`app/quiz/grading.py`).

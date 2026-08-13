@@ -19,10 +19,12 @@ import re
 import subprocess
 import wave
 
-from . import gemini
+from . import gemini, models
 
 DEFAULT_VOICE = "Kore"
-DEFAULT_MODEL = "gemini-2.5-flash-preview-tts"
+# Naziv se ne zamrzava ovde - registar zna sta je aktuelno, a pozivalac obicno
+# prosledi ono sto je razreseno sa korisnikovog kljuca.
+DEFAULT_MODEL = models.default_for("tts")
 
 _SAMPLE_RATE = 24000
 _MAX_CHARS = 4000

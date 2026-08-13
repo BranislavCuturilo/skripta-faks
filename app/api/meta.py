@@ -4,7 +4,7 @@ from .. import __version__, db, netinfo
 from ..http_util import Request, Response, json_response
 from ..quiz import types as question_types
 from ..router import router
-from ..services import categories, settings_store
+from ..services import ai_models, categories, settings_store
 
 
 @router.get("/api/health")
@@ -24,6 +24,7 @@ def bootstrap(request: Request) -> Response:
             "question_types": question_types.catalog(),
             "stats": _global_stats(),
             "network": netinfo.info(),
+            "models": ai_models.status(),
         }
     )
 

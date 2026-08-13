@@ -10,7 +10,7 @@ from typing import Optional
 from .. import db
 from ..ai import contract, gemini, prompts
 from ..http_util import HttpError
-from . import categories, materials, settings_store, strategy
+from . import ai_models, categories, materials, settings_store, strategy
 
 MAX_MATERIAL_CHARS = 60000
 
@@ -83,10 +83,10 @@ def generate(category_id: int, gaps: Optional[list[str]] = None) -> dict:
         gaps=gaps,
         language=settings_store.get("ui_language", "sr"),
     )
-    result = gemini.generate(
-        api_key,
-        settings_store.get("model_standard"),
+    result = ai_models.generate(
+        "standard",
         prompt,
+        api_key=api_key,
         system="Ti si tutor koji pise sazete dopune gradiva. Odgovaras iskljucivo JSON-om.",
         json_output=True,
         temperature=0.5,

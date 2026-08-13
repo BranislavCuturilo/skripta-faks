@@ -4,7 +4,7 @@ from .. import db
 from ..ai import gemini, tts
 from ..http_util import HttpError, Request, Response, json_response
 from ..router import router
-from ..services import generation, jobs, notes, settings_store, strategy
+from ..services import ai_models, generation, jobs, notes, settings_store, strategy
 
 
 # ----------------------------------------------------------------- generisanje
@@ -169,10 +169,33 @@ def delete_note(request: Request) -> Response:
 
 @router.get("/api/models")
 def list_models(request: Request) -> Response:
-    api_key = settings_store.get("gemini_api_key", "")
-    if not api_key:
-        return json_response({"ok": False, "error": "Nije unet API kljuc.", "models": []})
-    return json_response(gemini.probe(api_key))
+    """Sta je dostupno i sta se trenutno koristi po nivou.
+
+    Spisak se ne trazi od Google-a na svako otvaranje ekrana - koristi se
+    zapamceni; `?refresh=1` ga osvezava.
+    """
+    if request.query.get("refresh") == "1":
+        return _refresh()
+    return json_response(
+        {
+            "ok": True,
+            "status": ai_models.status(),
+            "models": ai_models.available(),
+            "key_set": bool(settings_store.get("gemini_api_key", "")),
+        }
+    )
+
+
+@router.post("/api/models/refresh")
+def refresh_models(request: Request) -> Response:
+    return _refresh()
+
+
+def _refresh() -> Response:
+    report = ai_models.refresh()
+    if not report.get("ok"):
+        raise HttpError(400, report.get("error") or "Spisak modela nije mogao da se učita.")
+    return json_response({"ok": True, "status": ai_models.status(), **report})
 
 
 @router.get("/api/ai/usage")
@@ -227,6 +250,7 @@ def speak(request: Request) -> Response:
             settings_store.get("gemini_api_key", ""),
             text,
             voice=str(data.get("voice") or settings_store.get("tts_voice", "")),
+            model=ai_models.for_tier("tts"),
         )
     except gemini.AiError as exc:
         raise HttpError(502, exc.message) from None

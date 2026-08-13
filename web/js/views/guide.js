@@ -32,8 +32,8 @@ export async function guide(root) {
       el('ol', {}, [
         el('li', {}, [
           'Otvori ',
-          el('a', { href: 'https://aistudio.google.com/apikey', target: '_blank',
-                    rel: 'noopener', text: 'aistudio.google.com/apikey' }),
+          el('a', { href: 'https://aistudio.google.com/api-keys', target: '_blank',
+                    rel: 'noopener', text: 'aistudio.google.com/api-keys' }),
         ]),
         el('li', { text: 'Prijavi se bilo kojim Google nalogom' }),
         el('li', { text: 'Klikni Create API key (ako pita za projekat — izaberi bilo koji)' }),
@@ -47,6 +47,14 @@ export async function guide(root) {
       el('div', { class: 'small faint',
                   text: 'Ključ stoji u data/skripta.db na tvom računaru, van gita. ' +
                         'Ne šalje se nikome osim Google-u, i nikad ti se ne prikazuje ceo nazad.' }),
+      el('div', { class: 'feedback feedback--partial mt1' }, [
+        el('div', { class: 'feedback__verdict', text: 'Ako ti je stariji ključ prestao da radi' }),
+        el('div', { class: 'feedback__body' }, [
+          'Google menja tip ključa, nezavisno od modela. Stari „standard" ključevi se već ',
+          'odbijaju, a tokom septembra 2026 prestaju da rade svi. Napravi novi na linku iznad ',
+          '— novi su automatski „auth" i rade dalje. Pitanja, napredak i materijali ostaju.',
+        ]),
+      ]),
       el('div', { class: 'btn-row mt1' }, [
         el('button', { class: `btn ${hasKey ? '' : 'btn--primary'}`,
                        text: hasKey ? 'Promeni ključ' : 'Unesi ključ',

@@ -40,7 +40,7 @@ može da generiše nova pitanja, ni da oceni odgovor koji nije doslovan.
 
 Ključ je **besplatan**.
 
-1. Otvori <https://aistudio.google.com/apikey>
+1. Otvori <https://aistudio.google.com/api-keys>
 2. Prijavi se svojim Google nalogom (bilo kojim, ne mora poslovni)
 3. Klikni **Create API key**
 4. Ako te pita za projekat, izaberi bilo koji ponuđeni ili **Create project**
@@ -49,9 +49,22 @@ Ključ je **besplatan**.
 U aplikaciji: **⚙ Podešavanja** → polje *Gemini API ključ* → nalepi →
 **Proveri i sačuvaj ključ**.
 
-Dugme odmah proba ključ i ispiše koliko modela ti je dostupno. Ako javi grešku,
-ključ nije dobro kopiran (najčešće fali poslednji znak) ili projekat nema
-uključen Gemini API.
+Dugme odmah proba ključ, ispiše koliko modela ti je dostupno i **odmah izabere
+koje će koristiti**.
+
+### Ako imaš stariji ključ koji je prestao da radi
+
+Google menja **tip** ključa, nezavisno od modela:
+
+- stari **standard** ključevi se već odbijaju ako nemaju ograničenja
+- **tokom septembra 2026 prestaju da rade svi standard ključevi**
+- novi ključevi napravljeni u AI Studiju su automatski **auth** ključevi i rade dalje
+
+Ako ti aplikacija javi *„API ključ nije prihvaćen"* ili *„Ključ nema pravo
+pristupa"*, a siguran si da si ga dobro prekopirao — ključ je verovatno stari
+tip. Rešenje je da na <https://aistudio.google.com/api-keys> napraviš **novi** i
+zameniš ga u Podešavanjima. Ništa drugo ne moraš da diraš; pitanja, napredak i
+materijali ostaju.
 
 **Gde ključ stoji:** u `data/skripta.db`, na tvom računaru. Ne šalje se nikome
 osim Google-u. Van gita je. Aplikacija ti ga nikad ne prikazuje ceo nazad — samo
@@ -74,7 +87,7 @@ U **Podešavanja → Potrošnja AI poziva** vidiš tačno koliko je poziva otiš
 
 | Opcija | Šta radi |
 |---|---|
-| **Modeli** (brz / standardni / najjači) | Koji se model zove za koji posao. Jači daje bolja pitanja, ali brže troši kvotu. Ako te kvota steže — spusti *standardni* na `flash-lite`. |
+| **Modeli** (brz / standardni / najjači / glas) | Koji se model zove za koji posao. Ostavi **Automatski** — aplikacija bira iz spiska koji vrati tvoj ključ i sama pređe na noviji kad ovaj bude penzionisan. Ručno biraš samo ako želiš baš određeni. Dugme *Osveži spisak modela* traži novu listu od Google-a. |
 | **Agresivnost (1–5)** | Koliko strogo se meri da nešto „znaš". 1 = *može po nešto i da ne znam* (prag 70%, duži razmaci). 5 = *moram sve da znam* (prag 95%, sve se vrti češće). |
 | **Pitanja po sesiji** | Koliko pitanja planira jedna sesija. |
 | **Varijacija po pitanju** | Koliko puta se ista provera znanja postavi iz drugog ugla. 0 = bez varijacija. U jednoj sesiji vidiš najviše jednu iz grupe. |
@@ -246,6 +259,8 @@ prekopiraj i njega i celu aplikaciju.
 | `START.bat` se otvori i odmah zatvori | Python nije u PATH-u. Reinstaliraj sa čekiranim *Add python.exe to PATH*. |
 | Browser kaže da stranica ne postoji | Server nije podignut — pogledaj crni prozor, tu piše greška. |
 | „Nije unet Gemini API ključ" | Podešavanja → unesi ključ i pritisni *Proveri i sačuvaj*. |
+| „API ključ nije prihvaćen" / „Ključ nema pravo pristupa" | Verovatno stari *standard* ključ. Napravi novi na <https://aistudio.google.com/api-keys> — vidi poglavlje 3. |
+| „Traženi model ne postoji za ovaj ključ" | Model je penzionisan. Podešavanja → *Osveži spisak modela*. Aplikacija to i sama pokuša pri prvom takvom pozivu. |
 | „Prešao si besplatnu kvotu" | Sačekaj minut-dva. Ili spusti model na *brz i jeftin*. |
 | Model vraća odsečene odgovore | Smanji *Pitanja po pozivu* ili *Znakova gradiva po pozivu*. |
 | PDF je „ide AI-u", a ima tekst | Skeniran je, ili koristi font bez mape znakova. Aplikacija to prepoznaje i šalje original — radi, samo troši više kvote. |

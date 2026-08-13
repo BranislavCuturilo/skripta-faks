@@ -2,7 +2,7 @@
 
 import { api, followJob } from '../api.js';
 import { el, mount, modal, field, toast, bytes, when, confirmDialog } from '../dom.js';
-import { store, reloadTree, typeLabel } from '../store.js';
+import { store, reloadTree, typeLabel, modelFor } from '../store.js';
 
 // ---------------------------------------------------------------- pregled
 
@@ -511,9 +511,9 @@ export async function generate(root, categoryId) {
           field('Model', el('select', {
             onChange: (event) => { options.tier = event.target.value; refreshPlan(); },
           }, [
-            el('option', { value: 'fast', text: `Brz i jeftin (${store.settings.model_fast})` }),
-            el('option', { value: 'standard', selected: true, text: `Standardni (${store.settings.model_standard})` }),
-            el('option', { value: 'strong', text: `Najjači (${store.settings.model_strong})` }),
+            el('option', { value: 'fast', text: `Brz i jeftin (${modelFor('fast')})` }),
+            el('option', { value: 'standard', selected: true, text: `Standardni (${modelFor('standard')})` }),
+            el('option', { value: 'strong', text: `Najjači (${modelFor('strong')})` }),
           ]), 'Jači model daje bolja pitanja ali brže troši besplatnu kvotu.'),
           numberInput('max_calls', 'Najviše poziva (0 = bez granice)', 0, 50),
         ]),

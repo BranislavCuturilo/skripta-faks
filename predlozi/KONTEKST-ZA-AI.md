@@ -62,17 +62,18 @@ aplikacija uopšte ovako izgleda.
 | `app/__init__.py` | 3 | skripta-faks: lokalna aplikacija za ucenje uz pomoc AI-ja, bez zavisnosti. |
 | `app/ai/__init__.py` | 6 | AI sloj: klijent, promptovi i ugovor o formatu odgovora. |
 | `app/ai/contract.py` | 210 | Ugovor o formatu izmedju aplikacije i bilo kog modela. |
-| `app/ai/gemini.py` | 318 | Gemini klijent na urllib. |
+| `app/ai/gemini.py` | 332 | Gemini klijent na urllib. |
+| `app/ai/models.py` | 133 | Koji se model zove za koji posao. |
 | `app/ai/prompts.py` | 379 | Sablonski promptovi. |
-| `app/ai/tts.py` | 118 | Izgovor teksta. |
+| `app/ai/tts.py` | 120 | Izgovor teksta. |
 | `app/api/__init__.py` | 11 | Registracija ruta. Uvoz modula je ono sto puni ruter, pa svi moraju da se |
-| `app/api/ai.py` | 242 | Rute za AI: generisanje, poslovi, strategija, dopune, izgovor. |
+| `app/api/ai.py` | 266 | Rute za AI: generisanje, poslovi, strategija, dopune, izgovor. |
 | `app/api/categories.py` | 86 | Rute za stablo kategorija. |
 | `app/api/materials.py` | 112 | Rute za materijale: upload, obrada, pregled. |
-| `app/api/meta.py` | 59 | Zdravlje aplikacije i jedan poziv koji browser radi na startu. |
+| `app/api/meta.py` | 60 | Zdravlje aplikacije i jedan poziv koji browser radi na startu. |
 | `app/api/proposals.py` | 84 | Rute za predloge nadogradnje aplikacije. |
 | `app/api/questions.py` | 60 | Rute za pitanja: pregled, izmena, beleske i flagovi. |
-| `app/api/settings.py` | 42 | Rute za podesavanja, ukljucujuci unos i proveru AI kljuca. |
+| `app/api/settings.py` | 52 | Rute za podesavanja, ukljucujuci unos i proveru AI kljuca. |
 | `app/api/study.py` | 118 | Rute za ucenje: sesija, sledece pitanje, odgovor, preskakanje, rezime. |
 | `app/config.py` | 85 | Putanje i podrazumevane vrednosti. Jedino mesto koje zna gde sta stoji. |
 | `app/db.py` | 442 | SQLite sloj: konekcija po niti, semа u migracijama, sitni upitni helperi. |
@@ -90,16 +91,17 @@ aplikacija uopšte ovako izgleda.
 | `app/router.py` | 107 | Minimalni ruter: sablon putanje -> funkcija. |
 | `app/server.py` | 243 | HTTP server nad standardnom bibliotekom. |
 | `app/services/__init__.py` | 1 | Poslovna logika. Rute u app/api su tanke i samo zovu ovo. |
+| `app/services/ai_models.py` | 152 | Izbor modela u toku rada, sa samopopravljanjem. |
 | `app/services/categories.py` | 293 | Kategorije: samo-referentno stablo bez ogranicenja dubine. |
-| `app/services/generation.py` | 449 | Generisanje pitanja iz materijala. |
+| `app/services/generation.py` | 454 | Generisanje pitanja iz materijala. |
 | `app/services/jobs.py` | 124 | Poslovi koji traju duze od jednog zahteva. |
 | `app/services/materials.py` | 222 | Materijali: sta korisnik uploaduje i sta se od toga da procitati. |
 | `app/services/notes.py` | 116 | AI dopune materijala. |
 | `app/services/proposals.py` | 316 | Predlozi za nadogradnju same aplikacije. |
 | `app/services/questions.py` | 330 | Pitanja: upis iz generisanja, citanje, korisnikove beleske i flagovi. |
-| `app/services/settings_store.py` | 113 | Podesavanja: kljuc-vrednost u bazi, sa tipiziranim podrazumevanim vrednostima. |
-| `app/services/strategy.py` | 315 | Adaptivna strategija: kako sistem menja nacin na koji te ispituje. |
-| `app/services/study.py` | 350 | Sesija ucenja: izbor pitanja, ocenjivanje, objasnjenja. |
+| `app/services/settings_store.py` | 120 | Podesavanja: kljuc-vrednost u bazi, sa tipiziranim podrazumevanim vrednostima. |
+| `app/services/strategy.py` | 314 | Adaptivna strategija: kako sistem menja nacin na koji te ispituje. |
+| `app/services/study.py` | 352 | Sesija ucenja: izbor pitanja, ocenjivanje, objasnjenja. |
 
 Ulazne tačke: `run.py` (pokretanje), `run_tests.py` (testovi), `mapa.py` (ovaj fajl).
 
@@ -113,14 +115,14 @@ Ulazne tačke: `run.py` (pokretanje), `run_tests.py` (testovi), `mapa.py` (ovaj 
 | `web/js/app.js` | 361 | Ulazna tačka: stablo u sidebar-u, rutiranje preko hash-a, tabovi predmeta. |
 | `web/js/dom.js` | 175 | Sitni DOM alati. Bez frameworka - `el` je sve sto treba za ovoliku aplikaciju. |
 | `web/js/render.js` | 406 | Crtanje pitanja, tip po tip. |
-| `web/js/store.js` | 97 | Stanje aplikacije. Malo je, pa je jedan objekat sa pretplatnicima dovoljan. |
+| `web/js/store.js` | 104 | Stanje aplikacije. Malo je, pa je jedan objekat sa pretplatnicima dovoljan. |
 | `web/js/tts.js` | 60 | Izgovor teksta. Tri motora, isti poziv. |
 | `web/js/views/category.js` | 547 | Ekrani unutar predmeta: pregled, materijali, generisanje pitanja. |
-| `web/js/views/guide.js` | 192 | Uputstvo unutar aplikacije. |
+| `web/js/views/guide.js` | 204 | Uputstvo unutar aplikacije. |
 | `web/js/views/library.js` | 447 | Pitanja, strategija i dopune - sve što se gleda van sesije učenja. |
 | `web/js/views/network.js` | 98 | Kartica "otvori na telefonu". |
 | `web/js/views/proposals.js` | 229 | Predlozi za nadogradnju same aplikacije. |
-| `web/js/views/settings.js` | 262 | Podešavanja: AI ključ, modeli, agresivnost, govor, izgled, potrošnja. |
+| `web/js/views/settings.js` | 319 | Podešavanja: AI ključ, modeli, agresivnost, govor, izgled, potrošnja. |
 | `web/js/views/study.js` | 406 | Ekran ucenja: podesavanje sesije, petlja pitanja, rezime. |
 
 Frontend je SPA bez frameworka: ES moduli, rutiranje preko `location.hash`, server servira samo statiku i JSON.
@@ -202,6 +204,7 @@ Frontend je SPA bez frameworka: ES moduli, rutiranje preko `location.hash`, serv
 | POST | `/api/materials/<int:material_id>/reprocess` | `reprocess_material` |
 | POST | `/api/misconceptions/<int:misconception_id>/resolve` | `resolve_misconception` |
 | GET | `/api/models` | `list_models` |
+| POST | `/api/models/refresh` | `refresh_models` |
 | GET | `/api/network` | `network` |
 | DELETE | `/api/notes/<int:note_id>` | `delete_note` |
 | GET | `/api/proposals` | `list_proposals` |

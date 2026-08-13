@@ -261,14 +261,28 @@ def _open(request: urllib.request.Request):
 
 
 def _friendly(status: int, detail: str) -> str:
+    """Poruka iz koje se vidi STA da se uradi, ne samo da nesto ne valja.
+
+    401 i 403 su ovde najvazniji: Google gasi stari tip kljuca ("standard") i
+    prelazi na "auth" kljuceve. Neogranicen standard kljuc se vec odbija, a od
+    septembra 2026 odbijaju se svi. Bez ove napomene korisnik vidi samo
+    "kljuc nije prihvacen" i misli da ga je pogresno prekopirao.
+    """
     messages = {
-        400: "Zahtev nije prihvacen. Cesto znaci da je materijal prevelik za jedan poziv.",
-        401: "API kljuc nije prihvacen.",
-        403: "API kljuc nema pravo pristupa ovom modelu.",
-        404: "Trazeni model ne postoji za ovaj kljuc.",
-        429: "Presao si besplatnu kvotu za sada. Sacekaj minut pa probaj ponovo.",
-        500: "Greska na Google-ovoj strani.",
-        503: "Model je trenutno preopterecen.",
+        400: ("Zahtev nije prihvaćen. Najčešće znači da je materijal prevelik za jedan poziv "
+              "— smanji broj znakova gradiva po pozivu u Podešavanjima."),
+        401: ("API ključ nije prihvaćen. Ako je stariji, verovatno je standard ključ — Google "
+              "ih gasi i svi prestaju da rade tokom septembra 2026. Napravi novi na "
+              "aistudio.google.com/api-keys; novi su automatski auth ključevi i rade dalje."),
+        403: ("Ključ nema pravo pristupa. Ili je standard ključ koji se više ne prihvata "
+              "(napravi novi na aistudio.google.com/api-keys), ili taj model nije dostupan "
+              "tvom nalogu."),
+        404: ("Traženi model ne postoji za ovaj ključ — verovatno je penzionisan. "
+              "Otvori Podešavanja i pritisni Osveži spisak modela."),
+        429: ("Prešao si besplatnu kvotu za sada. Sačekaj minut-dva pa probaj ponovo, "
+              "ili spusti model na brži i jeftiniji."),
+        500: "Greška na Google-ovoj strani. Probaj ponovo za koji minut.",
+        503: "Model je trenutno preopterećen. Probaj ponovo za koji minut.",
     }
     base = messages.get(status, f"Poziv nije uspeo (HTTP {status}).")
     return f"{base} {detail}".strip() if detail else base

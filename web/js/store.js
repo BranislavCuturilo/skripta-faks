@@ -9,6 +9,7 @@ export const store = {
   tree: [],
   questionTypes: [],
   stats: {},
+  models: { tiers: [] },
   version: '',
   categoryId: null,
   tab: 'pregled',
@@ -30,6 +31,7 @@ export async function bootstrap() {
   store.tree = payload.tree;
   store.questionTypes = payload.question_types;
   store.stats = payload.stats;
+  store.models = payload.models || { tiers: [] };
   store.version = payload.version;
   applyTheme(store.settings.theme);
   emit();
@@ -52,6 +54,11 @@ export async function saveSettings(values) {
 
 export function applyTheme(theme) {
   document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+}
+
+export function modelFor(tier) {
+  const found = (store.models.tiers || []).find((item) => item.tier === tier);
+  return found ? found.model : '';
 }
 
 export function typeLabel(key) {
