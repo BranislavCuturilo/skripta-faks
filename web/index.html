@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="sr" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>skripta-faks</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#128218;</text></svg>">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__head">
+        <div class="brand">skripta<span>-faks</span></div>
+      </div>
+      <div class="sidebar__body" id="tree"></div>
+      <div class="sidebar__foot">
+        <button class="btn btn--sm grow" id="new-category">+ Novi predmet</button>
+        <button class="btn btn--sm btn--icon" id="open-settings" title="Podesavanja">&#9881;</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="btn btn--ghost btn--icon menu-toggle" id="menu-toggle" title="Meni">&#9776;</button>
+        <div class="topbar__title" id="page-title">skripta-faks</div>
+        <div id="topbar-actions" class="btn-row"></div>
+      </header>
+      <div class="content" id="view"></div>
+    </main>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+  <div id="modal-root"></div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Podaci korisnika - nikad u git.
+# `data/*` a ne `data/`: git ne ume da izuzme fajl iz ignorisanog FOLDERA,
+# pa bi .gitkeep ostao neprazen i folder ne bi postojao posle kloniranja.
+data/*
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+
+# Lokalna podesavanja koja mogu da sadrze kljuceve
+*.local.json
+secrets.json
