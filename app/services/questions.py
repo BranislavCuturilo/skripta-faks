@@ -95,6 +95,11 @@ def _presentation(question_type: str, payload: dict) -> dict:
         ]
     if question_type == "work_it_out":
         visible["allow_photo"] = payload.get("allow_photo", True)
+    if question_type == "flashcard":
+        # Jedini tip kod koga poledjina sme napolje pre ocenjivanja: korisnik se
+        # ocenjuje sam, pa "znao sam / nisam znao" nema smisla dok odgovor ne
+        # vidi. Za svaki drugi tip ovde i dalje ne izlazi nista sto ga odaje.
+        visible["back"] = payload.get("back", "")
     visible["answer_kind"] = question_types.get(question_type).answer_kind
     return visible
 

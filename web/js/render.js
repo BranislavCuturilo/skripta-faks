@@ -372,8 +372,15 @@ RENDERERS.work_it_out = (question) => {
 
 RENDERERS.flashcard = (question) => {
   let known = null;
+  // Poledjina stize uz pitanje (`presentation.back`) bas zato sto se korisnik
+  // ocenjuje sam: "znao sam / nisam znao" nema smisla dok odgovor ne vidi.
+  const answerText = question.presentation.back || '';
+  const answerNode = el('div', { class: 'prose', text: answerText });
   const back = el('div', { class: 'card mt1 hidden' }, [
-    el('div', { class: 'card__body' }, [el('div', { class: 'prose', text: '' })]),
+    el('div', { class: 'card__body' }, [
+      el('div', { class: 'field__label', text: 'Tačan odgovor' }),
+      answerNode,
+    ]),
   ]);
   const buttons = el('div', { class: 'btn-row mt1 hidden' });
 
@@ -387,17 +394,23 @@ RENDERERS.flashcard = (question) => {
     },
   });
 
+  const grade = (value) => {
+    known = value;
+    buttons.dispatchEvent(new CustomEvent('answered', { bubbles: true }));
+  };
+
   buttons.append(
-    el('button', { class: 'btn btn--good', text: 'Znao sam', onClick: () => { known = true; buttons.dispatchEvent(new CustomEvent('answered', { bubbles: true })); } }),
-    el('button', { class: 'btn btn--danger', text: 'Nisam znao', onClick: () => { known = false; buttons.dispatchEvent(new CustomEvent('answered', { bubbles: true })); } }),
+    el('div', { class: 'tiny faint', style: { width: '100%' }, text: 'Da li si znao ovaj odgovor?' }),
+    el('button', { class: 'btn btn--good', text: 'Znao sam', onClick: () => grade(true) }),
+    el('button', { class: 'btn btn--danger', text: 'Nisam znao', onClick: () => grade(false) }),
   );
 
   return {
     node: el('div', {}, [flip, back, buttons]),
     collect: () => ({ known }),
-    reveal: (result) => {
+    reveal: () => {
+      // Odgovor ostaje na ekranu; sklanjaju se samo dugmad za samoocenjivanje.
       back.classList.remove('hidden');
-      back.querySelector('.prose').textContent = result.correct_text || '';
       buttons.classList.add('hidden');
       flip.classList.add('hidden');
     },

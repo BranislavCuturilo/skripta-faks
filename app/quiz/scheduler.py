@@ -222,8 +222,17 @@ def _candidates(
 
     skip_clause = ""
     if session_id:
-        skip_clause = "AND q.id NOT IN (SELECT question_id FROM session_skip WHERE session_id = ?)"
-        params.append(session_id)
+        # Dva izuzimanja, oba vezana za tekucu sesiju:
+        #   - preskoceno ("ne sada")
+        #   - vec odgovoreno u ovoj sesiji
+        # Bez drugog, netacan odgovor obara mastery na dno i gura `due_at` na
+        # +10 minuta, pa adaptivni redosled isto pitanje vraca odmah - i vraca
+        # ga dok se ne pogodi. Ponavljanje pripada SLEDECOJ sesiji.
+        skip_clause = (
+            "AND q.id NOT IN (SELECT question_id FROM session_skip WHERE session_id = ?) "
+            "AND q.id NOT IN (SELECT question_id FROM attempt WHERE session_id = ?)"
+        )
+        params.extend((session_id, session_id))
 
     return db.query(
         f"""
