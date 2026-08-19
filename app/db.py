@@ -289,6 +289,18 @@ migration(
     """
 )
 
+migration(
+    """
+    -- Odakle je pitanje: 'ai' (generisano iz gradiva) ili 'exam' (doslovno
+    -- uvezeno iz fiksne liste ispitnih pitanja - AI ga nije pisao ni menjao).
+    ALTER TABLE question ADD COLUMN origin TEXT NOT NULL DEFAULT 'ai';
+    CREATE INDEX idx_question_origin ON question(category_id, origin);
+
+    -- Sesija sme da se ogranici na jedno poreklo ('' = sva).
+    ALTER TABLE study_session ADD COLUMN origin_filter TEXT NOT NULL DEFAULT '';
+    """
+)
+
 
 def connect() -> sqlite3.Connection:
     conn = getattr(_local, "conn", None)

@@ -4,6 +4,12 @@ import { api, followJob } from '../api.js';
 import { el, mount, modal, field, toast, bytes, when, confirmDialog } from '../dom.js';
 import { store, reloadTree, typeLabel, modelFor } from '../store.js';
 
+const RUN_KIND = {
+  manual_import: 'ručni uvoz',
+  exam_local: 'ispitna baza, doslovno',
+  exam_ai: 'ispitna baza, AI prepis',
+};
+
 // ---------------------------------------------------------------- pregled
 
 export async function overview(root, categoryId, go) {
@@ -92,7 +98,7 @@ export async function overview(root, categoryId, go) {
   );
 }
 
-function tile(value, label, kind = '') {
+export function tile(value, label, kind = '') {
   return el('div', { class: `stat ${kind ? 'stat--' + kind : ''}` }, [
     el('div', { class: 'stat__value', text: String(value ?? 0) }),
     el('div', { class: 'stat__label', text: label }),
@@ -283,6 +289,54 @@ function statusLabel(row) {
   return 'čeka obradu';
 }
 
+
+// Rezime uvoza pitanja - isti za generisanje, rucni uvoz i ispitnu bazu.
+export function showImportResult(result, { title = 'Generisanje završeno', extraTiles = [], skipped = [] } = {}) {
+  modal({
+    title,
+    body: el('div', {}, [
+      el('div', { class: 'grid mb2' }, [
+        tile(result.inserted || 0, 'novih pitanja', 'mastered'),
+        tile(result.duplicates || 0, 'duplikata'),
+        tile((result.rejected || []).length, 'odbijeno', 'weak'),
+        ...(extraTiles.length ? extraTiles.map(([value, label, kind]) => tile(value, label, kind))
+                              : [tile(result.calls || 0, 'poziva')]),
+      ]),
+      (result.errors || []).length
+        ? el('div', { class: 'card' }, [
+            el('div', { class: 'card__head' }, ['Napomene']),
+            el('div', { class: 'card__body small' }, (result.errors || []).map((item) =>
+              el('div', { class: 'mb1', text: '• ' + item }))),
+          ])
+        : null,
+      skipped.length
+        ? el('div', { class: 'card' }, [
+            el('div', { class: 'card__head' }, ['Preskočena pitanja i zašto']),
+            el('div', { class: 'list' }, skipped.slice(0, 30).map((item) =>
+              el('div', { class: 'list__row' }, [
+                el('div', { class: 'list__main' }, [
+                  el('div', { class: 'list__title', text: `${item.number ? item.number + '. ' : ''}${item.stem || '(bez teksta)'}` }),
+                  el('div', { class: 'list__meta', text: item.reason }),
+                ]),
+              ]))),
+          ])
+        : null,
+      (result.rejected || []).length
+        ? el('div', { class: 'card' }, [
+            el('div', { class: 'card__head' }, ['Odbijena pitanja i zašto']),
+            el('div', { class: 'list' }, (result.rejected || []).slice(0, 30).map((item) =>
+              el('div', { class: 'list__row' }, [
+                el('div', { class: 'list__main' }, [
+                  el('div', { class: 'list__title', text: item.stem || '(bez teksta)' }),
+                  el('div', { class: 'list__meta', text: item.reason }),
+                ]),
+              ]))),
+          ])
+        : null,
+    ]),
+  });
+}
+
 // ---------------------------------------------------------------- generisanje
 
 export async function generate(root, categoryId) {
@@ -371,42 +425,9 @@ export async function generate(root, categoryId) {
 
     mount(jobBox);
     if (finished.status === 'failed') { toast(finished.error || 'Generisanje nije uspelo.', 'bad'); }
-    else showResult(finished.result || {});
+    else showImportResult(finished.result || {});
     reloadTree();
     loadRuns();
-  }
-
-  function showResult(result) {
-    modal({
-      title: 'Generisanje završeno',
-      body: el('div', {}, [
-        el('div', { class: 'grid mb2' }, [
-          tile(result.inserted || 0, 'novih pitanja', 'mastered'),
-          tile(result.duplicates || 0, 'duplikata'),
-          tile((result.rejected || []).length, 'odbijeno', 'weak'),
-          tile(result.calls || 0, 'poziva'),
-        ]),
-        (result.errors || []).length
-          ? el('div', { class: 'card' }, [
-              el('div', { class: 'card__head' }, ['Napomene']),
-              el('div', { class: 'card__body small' }, (result.errors || []).map((item) =>
-                el('div', { class: 'mb1', text: '• ' + item }))),
-            ])
-          : null,
-        (result.rejected || []).length
-          ? el('div', { class: 'card' }, [
-              el('div', { class: 'card__head' }, ['Odbijena pitanja i zašto']),
-              el('div', { class: 'list' }, (result.rejected || []).slice(0, 20).map((item) =>
-                el('div', { class: 'list__row' }, [
-                  el('div', { class: 'list__main' }, [
-                    el('div', { class: 'list__title', text: item.stem || '(bez teksta)' }),
-                    el('div', { class: 'list__meta', text: item.reason }),
-                  ]),
-                ]))),
-            ])
-          : null,
-      ]),
-    });
   }
 
   async function openExport() {
@@ -466,7 +487,7 @@ export async function generate(root, categoryId) {
                                         { text: area.value });
           toast(`Uvezeno ${result.inserted}, duplikata ${result.duplicates}, odbijeno ${result.rejected.length}`,
                 result.inserted ? 'good' : 'bad');
-          if (result.rejected.length) showResult({ ...result, rejected: result.rejected });
+          if (result.rejected.length) showImportResult({ ...result, rejected: result.rejected });
           reloadTree();
           loadRuns();
         } catch (error) {
@@ -485,7 +506,7 @@ export async function generate(root, categoryId) {
       el('div', { class: 'list' }, runs.slice(0, 15).map((run) =>
         el('div', { class: 'list__row' }, [
           el('div', { class: 'list__main' }, [
-            el('div', { class: 'list__title', text: `${run.model} · ${run.source_kind === 'manual_import' ? 'ručni uvoz' : 'automatski'}` }),
+            el('div', { class: 'list__title', text: `${run.model} · ${RUN_KIND[run.source_kind] || 'automatski'}` }),
             el('div', { class: 'list__meta',
                         text: `${when(run.created_at)}${run.error ? ' · ' + run.error : ''}` }),
           ]),

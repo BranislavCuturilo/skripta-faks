@@ -114,6 +114,7 @@ def pick(
     session_id: Optional[int] = None,
     type_filter: Optional[list[str]] = None,
     mode: str = "adaptive",
+    origin: str = "",
 ) -> list[dict]:
     """Izaberi pitanja za sesiju.
 
@@ -124,7 +125,7 @@ def pick(
         return []
 
     mastery_threshold, _, mastered_share = profile(aggressiveness)
-    rows = _candidates(category_ids, session_id, type_filter)
+    rows = _candidates(category_ids, session_id, type_filter, origin)
     if not rows:
         return []
 
@@ -210,7 +211,10 @@ def _dedupe_variants(rows: list[dict], limit: int) -> list[dict]:
 
 
 def _candidates(
-    category_ids: list[int], session_id: Optional[int], type_filter: Optional[list[str]]
+    category_ids: list[int],
+    session_id: Optional[int],
+    type_filter: Optional[list[str]],
+    origin: str = "",
 ) -> list[dict]:
     marks = ", ".join("?" for _ in category_ids)
     params: list = list(category_ids)
@@ -219,6 +223,9 @@ def _candidates(
     if type_filter:
         type_clause = f"AND q.type IN ({', '.join('?' for _ in type_filter)})"
         params.extend(type_filter)
+    if origin:
+        type_clause += " AND q.origin = ?"
+        params.append(origin)
 
     skip_clause = ""
     if session_id:

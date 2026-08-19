@@ -484,3 +484,62 @@ def _correct_answer(question: dict) -> dict:
         options = question["presentation"]["options"]
         return {"index": options.index("4")}
     raise AssertionError(f"test ne zna da odgovori na tip {question['type']}")
+
+
+class ClientDisconnectTests(HttpTestCase):
+    """Telefon koji prekine vezu ne sme da ostavi traceback u konzoli.
+
+    `socketserver` podrazumevano stampa ceo stack za svaki izuzetak iz niti
+    zahteva, ukljucujuci `ConnectionResetError` koji se desi izmedju dva
+    keep-alive zahteva. Korisnici su to slali kao "greska u aplikaciji".
+    """
+
+    def _stderr_of(self, exc):
+        import io
+        from contextlib import redirect_stderr
+
+        buffer = io.StringIO()
+        with redirect_stderr(buffer):
+            try:
+                raise exc
+            except Exception:  # noqa: BLE001 - test simulira granicu niti
+                self.httpd.handle_error(None, ("192.168.100.88", 62443))
+        return buffer.getvalue()
+
+    def test_connection_reset_is_silent(self):
+        for exc in (
+            ConnectionResetError(10054, "forcibly closed"),
+            ConnectionAbortedError(10053, "aborted"),
+            BrokenPipeError(),
+            TimeoutError(),
+        ):
+            self.assertEqual(self._stderr_of(exc), "", f"{type(exc).__name__} ne sme u konzolu")
+
+    def test_real_errors_are_still_reported(self):
+        output = self._stderr_of(RuntimeError("nesto stvarno puklo"))
+        self.assertIn("RuntimeError", output)
+        self.assertIn("nesto stvarno puklo", output)
+
+    def test_abrupt_close_mid_request_does_not_kill_the_server(self):
+        import socket
+
+        raw = socket.create_connection(("127.0.0.1", self.port), timeout=5)
+        raw.sendall(b"POST /api/categories HTTP/1.1\r\nHost: x\r\nContent-Length: 999\r\n\r\n{")
+        # RST umesto FIN: tacno ono sto telefon uradi kad zakljuca ekran.
+        raw.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, b"\x01\x00\x00\x00\x00\x00\x00\x00")
+        raw.close()
+
+        payload = self.call("GET", "/api/categories")
+        self.assertTrue(payload["ok"], "server mora da nastavi da sluzi posle prekinute veze")
+
+
+class NormalizeScriptApiTests(HttpTestCase):
+    def test_endpoint_uses_the_configured_question_language(self):
+        category = self.call("POST", "/api/categories", {"name": "Obuka"}, expect=201)["category"]
+        self.make_question(category["id"], stem="Pitanje sa мешаним писмом unutra?",
+                           payload={"options": ["да", "ne"], "correct_index": 0})
+        result = self.call("POST", "/api/questions/normalize-script", {})
+        self.assertEqual(result["script"], "latin")
+        self.assertEqual(result["changed"], 1)
+        listing = self.call("GET", f"/api/categories/{category['id']}/questions")
+        self.assertEqual(listing["items"][0]["stem"], "Pitanje sa mešanim pismom unutra?")

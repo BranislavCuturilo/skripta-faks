@@ -1,8 +1,9 @@
 """Rute za pitanja: pregled, izmena, beleske i flagovi."""
 
-from ..http_util import Request, Response, json_response
+from .. import translit
+from ..http_util import HttpError, Request, Response, json_response
 from ..router import router
-from ..services import categories, questions
+from ..services import categories, questions, settings_store
 
 
 @router.get("/api/categories/<int:category_id>/questions")
@@ -19,13 +20,19 @@ def list_questions(request: Request) -> Response:
         search=query.get("q", ""),
         question_type=query.get("type", ""),
         flag=query.get("flag", ""),
+        origin=query.get("origin", ""),
         include_deleted=query.get("deleted") == "1",
         include_ignored=query.get("ignored", "1") == "1",
         limit=max(1, min(500, int(query.get("limit") or 100))),
         offset=max(0, int(query.get("offset") or 0)),
     )
     return json_response(
-        {"ok": True, **result, "type_counts": questions.type_counts(ids)}
+        {
+            "ok": True,
+            **result,
+            "type_counts": questions.type_counts(ids),
+            "origin_counts": questions.origin_counts(ids),
+        }
     )
 
 
@@ -58,3 +65,15 @@ def set_question_meta(request: Request) -> Response:
 def purge_question(request: Request) -> Response:
     questions.purge(request.params["question_id"])
     return json_response({"ok": True})
+
+
+@router.post("/api/questions/normalize-script")
+def normalize_question_script(request: Request) -> Response:
+    """Ujednaci pismo u svim postojecim pitanjima po podesenom jeziku pitanja."""
+    data = request.data()
+    script = data.get("script") or translit.script_for_language(
+        settings_store.get("question_language", "sr")
+    )
+    if not script:
+        raise HttpError(400, "Za izabrani jezik pitanja nema pisma koje bi se ujednacilo.")
+    return json_response({"ok": True, "script": script, **questions.normalize_script(script)})

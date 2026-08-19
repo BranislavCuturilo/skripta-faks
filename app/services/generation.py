@@ -14,7 +14,7 @@ Isti put postoji i rucno: `export_prompt` da tekst odnesеs u Claude, pa
 import json
 from typing import Any, Optional
 
-from .. import config, db
+from .. import config, db, translit
 from ..ai import contract, gemini, prompts
 from ..http_util import HttpError
 from . import ai_models, categories, materials, questions, settings_store, strategy
@@ -26,6 +26,15 @@ FILES_PER_CALL = 4
 def resolve_model(tier: str) -> str:
     """Naziv se ne cita iz konstante nego se razresava - vidi services/ai_models.py."""
     return ai_models.for_tier(tier)
+
+
+def question_script() -> Optional[str]:
+    """Pismo koje se namece svakom pitanju pre upisa ('latin', 'cyrillic' ili None).
+
+    Model dobije uputstvo u promptu, ali ga ne postuje uvek - vraca pola
+    latinicom, pola cirilicom kad je gradivo cirilicno. Ovo je garancija.
+    """
+    return translit.script_for_language(settings_store.get("question_language", "sr"))
 
 
 def plan(category_id: int, options: Optional[dict] = None) -> dict:
@@ -150,7 +159,7 @@ def import_manual(category_id: int, raw_text: str) -> dict:
                                              "finished_at": _now()})
         raise HttpError(400, f"Nalepljeni tekst nije u ocekivanom formatu: {exc}") from None
 
-    accepted, rejected = contract.validate_all(parsed["questions"])
+    accepted, rejected = contract.validate_all(parsed["questions"], script=question_script())
     written = questions.insert_many(category_id, run_id, accepted)
 
     db.update(
@@ -324,7 +333,7 @@ def _one_call(
         summary["errors"].append(f"Odgovor modela nije upotrebljiv: {exc}")
         return
 
-    accepted, rejected = contract.validate_all(parsed["questions"])
+    accepted, rejected = contract.validate_all(parsed["questions"], script=question_script())
     written = questions.insert_many(category_id, run_id, accepted)
 
     db.update(

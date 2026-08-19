@@ -61,47 +61,51 @@ aplikacija uopšte ovako izgleda.
 |---|---:|---|
 | `app/__init__.py` | 3 | skripta-faks: lokalna aplikacija za ucenje uz pomoc AI-ja, bez zavisnosti. |
 | `app/ai/__init__.py` | 6 | AI sloj: klijent, promptovi i ugovor o formatu odgovora. |
-| `app/ai/contract.py` | 210 | Ugovor o formatu izmedju aplikacije i bilo kog modela. |
+| `app/ai/contract.py` | 228 | Ugovor o formatu izmedju aplikacije i bilo kog modela. |
 | `app/ai/gemini.py` | 332 | Gemini klijent na urllib. |
 | `app/ai/models.py` | 133 | Koji se model zove za koji posao. |
-| `app/ai/prompts.py` | 379 | Sablonski promptovi. |
+| `app/ai/prompts.py` | 445 | Sablonski promptovi. |
 | `app/ai/tts.py` | 120 | Izgovor teksta. |
-| `app/api/__init__.py` | 11 | Registracija ruta. Uvoz modula je ono sto puni ruter, pa svi moraju da se |
+| `app/api/__init__.py` | 12 | Registracija ruta. Uvoz modula je ono sto puni ruter, pa svi moraju da se |
 | `app/api/ai.py` | 266 | Rute za AI: generisanje, poslovi, strategija, dopune, izgovor. |
 | `app/api/categories.py` | 86 | Rute za stablo kategorija. |
+| `app/api/exam.py` | 28 | Rute za doslovan uvoz ispitnih pitanja (fiksna lista sa fakulteta). |
 | `app/api/materials.py` | 112 | Rute za materijale: upload, obrada, pregled. |
 | `app/api/meta.py` | 60 | Zdravlje aplikacije i jedan poziv koji browser radi na startu. |
 | `app/api/proposals.py` | 84 | Rute za predloge nadogradnje aplikacije. |
-| `app/api/questions.py` | 60 | Rute za pitanja: pregled, izmena, beleske i flagovi. |
+| `app/api/questions.py` | 79 | Rute za pitanja: pregled, izmena, beleske i flagovi. |
 | `app/api/settings.py` | 52 | Rute za podesavanja, ukljucujuci unos i proveru AI kljuca. |
 | `app/api/study.py` | 118 | Rute za ucenje: sesija, sledece pitanje, odgovor, preskakanje, rezime. |
 | `app/config.py` | 85 | Putanje i podrazumevane vrednosti. Jedino mesto koje zna gde sta stoji. |
-| `app/db.py` | 442 | SQLite sloj: konekcija po niti, semа u migracijama, sitni upitni helperi. |
+| `app/db.py` | 454 | SQLite sloj: konekcija po niti, semа u migracijama, sitni upitni helperi. |
 | `app/extract/__init__.py` | 110 | Ekstrakcija teksta iz uploadovanih materijala. |
 | `app/extract/chunking.py` | 133 | Deljenje izvucenog teksta na komade koji staju u jedan AI poziv. |
+| `app/extract/exam_parser.py` | 395 | Prepoznavanje gotove liste ispitnih pitanja u obicnom tekstu - BEZ AI-ja. |
 | `app/extract/ooxml.py` | 177 | docx / xlsx / pptx bez ijedne biblioteke. |
 | `app/extract/pdf.py` | 620 | Citanje teksta iz PDF-a samo standardnom bibliotekom. |
 | `app/extract/plaintext.py` | 52 | Obicni tekstualni formati. Kodiranje se pogadja, ne pretpostavlja. |
 | `app/http_util.py` | 349 | Request/response sloj nad http.server. |
 | `app/netinfo.py` | 93 | Pod kojim adresama je aplikacija dostupna. |
 | `app/quiz/__init__.py` | 1 | Kviz: tipovi pitanja, ocenjivanje, raspored ponavljanja. |
-| `app/quiz/grading.py` | 344 | Ocenjivanje odgovora. |
-| `app/quiz/scheduler.py` | 268 | Raspored ponavljanja i izbor sledeceg pitanja. |
+| `app/quiz/grading.py` | 345 | Ocenjivanje odgovora. |
+| `app/quiz/scheduler.py` | 284 | Raspored ponavljanja i izbor sledeceg pitanja. |
 | `app/quiz/types.py` | 424 | Registar tipova pitanja. |
 | `app/router.py` | 107 | Minimalni ruter: sablon putanje -> funkcija. |
-| `app/server.py` | 243 | HTTP server nad standardnom bibliotekom. |
+| `app/server.py` | 259 | HTTP server nad standardnom bibliotekom. |
 | `app/services/__init__.py` | 1 | Poslovna logika. Rute u app/api su tanke i samo zovu ovo. |
 | `app/services/ai_models.py` | 152 | Izbor modela u toku rada, sa samopopravljanjem. |
 | `app/services/categories.py` | 293 | Kategorije: samo-referentno stablo bez ogranicenja dubine. |
-| `app/services/generation.py` | 454 | Generisanje pitanja iz materijala. |
+| `app/services/exam_import.py` | 452 | Uvoz fiksne liste ispitnih pitanja - DOSLOVNO, bez AI prepravljanja. |
+| `app/services/generation.py` | 463 | Generisanje pitanja iz materijala. |
 | `app/services/jobs.py` | 124 | Poslovi koji traju duze od jednog zahteva. |
 | `app/services/materials.py` | 222 | Materijali: sta korisnik uploaduje i sta se od toga da procitati. |
 | `app/services/notes.py` | 116 | AI dopune materijala. |
 | `app/services/proposals.py` | 316 | Predlozi za nadogradnju same aplikacije. |
-| `app/services/questions.py` | 330 | Pitanja: upis iz generisanja, citanje, korisnikove beleske i flagovi. |
+| `app/services/questions.py` | 417 | Pitanja: upis iz generisanja, citanje, korisnikove beleske i flagovi. |
 | `app/services/settings_store.py` | 120 | Podesavanja: kljuc-vrednost u bazi, sa tipiziranim podrazumevanim vrednostima. |
 | `app/services/strategy.py` | 314 | Adaptivna strategija: kako sistem menja nacin na koji te ispituje. |
-| `app/services/study.py` | 352 | Sesija ucenja: izbor pitanja, ocenjivanje, objasnjenja. |
+| `app/services/study.py` | 360 | Sesija ucenja: izbor pitanja, ocenjivanje, objasnjenja. |
+| `app/translit.py` | 135 | Srpska latinica <-> cirilica. |
 
 Ulazne tačke: `run.py` (pokretanje), `run_tests.py` (testovi), `mapa.py` (ovaj fajl).
 
@@ -112,18 +116,19 @@ Ulazne tačke: `run.py` (pokretanje), `run_tests.py` (testovi), `mapa.py` (ovaj 
 | `web/css/style.css` | 507 | — |
 | `web/index.html` | 43 | — |
 | `web/js/api.js` | 67 | Jedan omotac oko fetch-a. Greska servera stize kao Error sa citljivom porukom, |
-| `web/js/app.js` | 361 | Ulazna tačka: stablo u sidebar-u, rutiranje preko hash-a, tabovi predmeta. |
+| `web/js/app.js` | 364 | Ulazna tačka: stablo u sidebar-u, rutiranje preko hash-a, tabovi predmeta. |
 | `web/js/dom.js` | 175 | Sitni DOM alati. Bez frameworka - `el` je sve sto treba za ovoliku aplikaciju. |
-| `web/js/render.js` | 406 | Crtanje pitanja, tip po tip. |
+| `web/js/render.js` | 451 | Crtanje pitanja, tip po tip. |
 | `web/js/store.js` | 104 | Stanje aplikacije. Malo je, pa je jedan objekat sa pretplatnicima dovoljan. |
 | `web/js/tts.js` | 60 | Izgovor teksta. Tri motora, isti poziv. |
-| `web/js/views/category.js` | 547 | Ekrani unutar predmeta: pregled, materijali, generisanje pitanja. |
+| `web/js/views/category.js` | 568 | Ekrani unutar predmeta: pregled, materijali, generisanje pitanja. |
+| `web/js/views/exam.js` | 274 | Ispitna baza: fiksna lista pitanja sa fakulteta ulazi u aplikaciju DOSLOVNO. |
 | `web/js/views/guide.js` | 204 | Uputstvo unutar aplikacije. |
-| `web/js/views/library.js` | 447 | Pitanja, strategija i dopune - sve što se gleda van sesije učenja. |
+| `web/js/views/library.js` | 448 | Pitanja, strategija i dopune - sve što se gleda van sesije učenja. |
 | `web/js/views/network.js` | 98 | Kartica "otvori na telefonu". |
 | `web/js/views/proposals.js` | 229 | Predlozi za nadogradnju same aplikacije. |
-| `web/js/views/settings.js` | 319 | Podešavanja: AI ključ, modeli, agresivnost, govor, izgled, potrošnja. |
-| `web/js/views/study.js` | 406 | Ekran ucenja: podesavanje sesije, petlja pitanja, rezime. |
+| `web/js/views/settings.js` | 349 | Podešavanja: AI ključ, modeli, agresivnost, govor, izgled, potrošnja. |
+| `web/js/views/study.js` | 424 | Ekran ucenja: podesavanje sesije, petlja pitanja, rezime. |
 
 Frontend je SPA bez frameworka: ES moduli, rutiranje preko `location.hash`, server servira samo statiku i JSON.
 
@@ -138,13 +143,13 @@ Frontend je SPA bez frameworka: ES moduli, rutiranje preko `location.hash`, serv
 - **`material_chunk`** (9) — `id`, `material_id`, `ordinal`, `label`, `text`, `char_count`, `page_from`, `page_to`, `created_at`
 - **`material_note`** (8) — `id`, `category_id`, `material_id`, `kind`, `title`, `body`, `author`, `created_at`
 - **`misconception`** (9) — `id`, `category_id`, `label`, `description`, `topic`, `evidence_count`, `resolved_at`, `first_seen_at`, `last_seen_at`
-- **`question`** (16) — `id`, `category_id`, `generation_run_id`, `type`, `stem`, `payload`, `explanation`, `difficulty`, `topic`, `source_ref`, `content_hash`, `variant_group`, `variant_index`, `state`, `created_at`, `updated_at`
+- **`question`** (17) — `id`, `category_id`, `generation_run_id`, `type`, `stem`, `payload`, `explanation`, `difficulty`, `topic`, `source_ref`, `content_hash`, `variant_group`, `variant_index`, `state`, `created_at`, `updated_at`, `origin`
 - **`question_meta`** (10) — `question_id`, `note`, `flag_review`, `flag_check_source`, `flag_irrelevant`, `flag_wrong`, `ignored_at`, `deleted_at`, `pinned`, `updated_at`
 - **`question_schedule`** (12) — `question_id`, `category_id`, `ease`, `interval_days`, `due_at`, `streak`, `lapses`, `seen_count`, `correct_count`, `mastery`, `last_seen_at`, `updated_at`
 - **`session_skip`** (4) — `session_id`, `question_id`, `reason`, `created_at`
 - **`setting`** (3) — `key`, `value`, `updated_at`
 - **`strategy`** (9) — `id`, `category_id`, `kind`, `version`, `content`, `rationale`, `author`, `active`, `created_at`
-- **`study_session`** (11) — `id`, `category_id`, `include_subtree`, `mode`, `aggressiveness`, `type_filter`, `planned_count`, `asked_count`, `correct_count`, `started_at`, `ended_at`
+- **`study_session`** (12) — `id`, `category_id`, `include_subtree`, `mode`, `aggressiveness`, `type_filter`, `planned_count`, `asked_count`, `correct_count`, `started_at`, `ended_at`, `origin_filter`
 
 ## Tipovi pitanja
 
@@ -178,6 +183,8 @@ Frontend je SPA bez frameworka: ES moduli, rutiranje preko `location.hash`, serv
 | GET | `/api/categories/<int:category_id>` | `read_category` |
 | PATCH | `/api/categories/<int:category_id>` | `update_category` |
 | POST | `/api/categories/<int:category_id>/archive` | `archive_category` |
+| POST | `/api/categories/<int:category_id>/exam/import` | `exam_import_questions` |
+| POST | `/api/categories/<int:category_id>/exam/preview` | `exam_preview` |
 | POST | `/api/categories/<int:category_id>/generate` | `generate_questions` |
 | POST | `/api/categories/<int:category_id>/generate/export` | `export_generation_prompt` |
 | POST | `/api/categories/<int:category_id>/generate/import` | `import_generated` |
@@ -219,6 +226,7 @@ Frontend je SPA bez frameworka: ES moduli, rutiranje preko `location.hash`, serv
 | PATCH | `/api/questions/<int:question_id>` | `edit_question` |
 | POST | `/api/questions/<int:question_id>/answer` | `answer_standalone` |
 | POST | `/api/questions/<int:question_id>/meta` | `set_question_meta` |
+| POST | `/api/questions/normalize-script` | `normalize_question_script` |
 | GET | `/api/settings` | `read_settings` |
 | PATCH | `/api/settings` | `write_settings` |
 | DELETE | `/api/settings/api-key` | `delete_api_key` |

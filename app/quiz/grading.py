@@ -11,6 +11,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import Callable
 
+from .. import translit
 from . import types as question_types
 
 
@@ -43,9 +44,9 @@ def grade(question: dict, payload: dict, answer: dict) -> Grade:
 
 
 def normalize(value: str) -> str:
-    """Poredjenje teksta koje prezivi padez, dijakritiku i interpunkciju."""
-    value = (value or "").strip().lower()
-    value = value.replace("đ", "dj").replace("ђ", "dj")
+    """Poredjenje teksta koje prezivi pismo, padez, dijakritiku i interpunkciju."""
+    value = translit.to_latin((value or "").strip()).lower()
+    value = value.replace("đ", "dj")
     value = unicodedata.normalize("NFKD", value)
     value = "".join(char for char in value if not unicodedata.combining(char))
     value = re.sub(r"[^\w\s]", " ", value, flags=re.UNICODE)

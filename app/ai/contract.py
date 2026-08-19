@@ -9,8 +9,9 @@ import hashlib
 import json
 import re
 import unicodedata
-from typing import Any
+from typing import Any, Optional
 
+from .. import translit
 from ..quiz import types as question_types
 
 _FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.IGNORECASE)
@@ -55,13 +56,17 @@ def parse(raw_text: str) -> dict:
     }
 
 
-def validate_all(items: list) -> tuple[list[dict], list[dict]]:
-    """Vrati (ispravna pitanja, odbijena sa razlogom). Jedno lose ne rusi ostala."""
+def validate_all(items: list, script: Optional[str] = None) -> tuple[list[dict], list[dict]]:
+    """Vrati (ispravna pitanja, odbijena sa razlogom). Jedno lose ne rusi ostala.
+
+    `script` ('latin' / 'cyrillic' / None) namece pismo svakom tekstu pitanja -
+    model ume da vrati pola latinicom, pola cirilicom, i to ne sme u bazu.
+    """
     accepted: list[dict] = []
     rejected: list[dict] = []
     for position, item in enumerate(items, start=1):
         try:
-            accepted.append(validate_one(item))
+            accepted.append(validate_one(item, script=script))
         except (question_types.InvalidQuestion, ContractError, TypeError, ValueError) as exc:
             rejected.append(
                 {
@@ -74,9 +79,17 @@ def validate_all(items: list) -> tuple[list[dict], list[dict]]:
     return accepted, rejected
 
 
-def validate_one(item: Any) -> dict:
+def validate_one(item: Any, script: Optional[str] = None) -> dict:
     if not isinstance(item, dict):
         raise ContractError("Stavka nije objekat.")
+    if script:
+        # Pre svega ostalog: i stem i payload i objasnjenje, rekurzivno. Hash
+        # se racuna tek posle, pa isto pitanje u dva pisma nije dva pitanja.
+        # Kljucevi ugovora ("mcq_single") nisu tekst i ne diraju se.
+        item = {
+            key: value if key in _SCRIPT_FREE else translit.enforce_deep(value, script)
+            for key, value in item.items()
+        }
 
     question_type = str(item.get("type") or "").strip()
     if not question_types.exists(question_type):
@@ -120,6 +133,7 @@ _TOP_LEVEL = {
     "type", "stem", "question", "explanation", "difficulty", "topic",
     "source_ref", "variant_group", "variant_index", "payload",
 }
+_SCRIPT_FREE = {"type", "difficulty", "variant_group", "variant_index"}
 
 
 def _check_blank_markers(stem: str, payload: dict) -> None:
@@ -153,7 +167,11 @@ def content_hash(question_type: str, stem: str, payload: dict) -> str:
 
 
 def _normalize_text(value: str) -> str:
-    value = unicodedata.normalize("NFKD", value.lower())
+    # Prvo u latinicu: bez ovoga bi sva cirilicna slova ispala u poslednjem
+    # koraku i dva razlicita cirilicna pitanja bi imala isti otisak - drugo bi
+    # tiho bilo odbaceno kao "duplikat".
+    value = translit.to_latin(value).lower()
+    value = unicodedata.normalize("NFKD", value)
     value = "".join(char for char in value if not unicodedata.combining(char))
     return re.sub(r"[^a-z0-9]+", " ", value).strip()
 

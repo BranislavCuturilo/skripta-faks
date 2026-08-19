@@ -8,6 +8,9 @@ ubacis materijale — PDF, slike, snimke, Word, tekst — napises sta se tacno u
 i sistem od toga generise pitanja. Onda te ispituje, prati sta gresis, i forsira
 bas to.
 
+Ako fakultet deli fiksnu listu ispitnih pitanja, tab **Ispitna baza** je uveze
+doslovno — bez AI prepravljanja — pa vezbas tacno ta pitanja.
+
 ## Sta ti treba
 
 Samo **Python 3.11+**. Nista drugo — nema `pip install`, nema `requirements.txt`.
@@ -64,6 +67,6 @@ Vidi [predlozi/README.md](predlozi/README.md).
 ## Za programere
 
 ```
-python run_tests.py     # ceo test suite (156 testova, bez pytest-a)
+python run_tests.py     # ceo test suite (230 testova, bez pytest-a)
 python mapa.py          # regenerise predlozi/KONTEKST-ZA-AI.md iz koda
 ```

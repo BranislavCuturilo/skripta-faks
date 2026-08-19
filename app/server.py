@@ -6,6 +6,7 @@ zavisnosti: server servira `web/`, a renderovanje radi browser.
 
 import os
 import socket
+import sys
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -41,6 +42,12 @@ _STATIC_TYPES = {
     ".ico": "image/x-icon",
     ".woff2": "font/woff2",
 }
+
+# Klijent je prekinuo vezu usred zahteva ili izmedju dva keep-alive zahteva:
+# telefon je zakljucao ekran, tab je zatvoren, Wi-Fi je trepnuo. Za server to
+# nije greska i ne zasluzuje traceback u konzoli - korisnik ga vidi i misli
+# da se aplikacija pokvarila.
+_CLIENT_GONE = (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, TimeoutError)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -88,7 +95,7 @@ class Handler(BaseHTTPRequestHandler):
                 response = self._serve_static(path)
         except HttpError as exc:
             response = error_response(exc.status, exc.message, exc.detail)
-        except BrokenPipeError:
+        except _CLIENT_GONE:
             return
         except Exception as exc:  # noqa: BLE001 - spoljna granica zahteva
             traceback.print_exc()
@@ -187,7 +194,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             if not head_only and body:
                 self.wfile.write(body)
-        except (BrokenPipeError, ConnectionResetError):
+        except _CLIENT_GONE:
             return
 
 
@@ -202,6 +209,15 @@ class Server(ThreadingHTTPServer):
     def shutdown_request(self, request) -> None:  # noqa: D102
         super().shutdown_request(request)
         db.close_thread_connection()
+
+    def handle_error(self, request, client_address) -> None:
+        """Podrazumevano `socketserver` stampa ceo traceback za svaki izuzetak
+        iz niti zahteva. Prekinuta veza se preskace tiho; sve ostalo ostaje
+        vidljivo, jer je to stvarna greska."""
+        exc = sys.exc_info()[1]
+        if isinstance(exc, _CLIENT_GONE):
+            return
+        super().handle_error(request, client_address)
 
 
 def lan_address() -> str:

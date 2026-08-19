@@ -30,10 +30,13 @@ export function studySetup(root, categoryId, onStarted) {
     aggressiveness: store.settings.aggressiveness || 3,
     include_subtree: true,
     type_filter: [],
+    origin_filter: '',
   };
 
   const summary = el('div', { class: 'grid mb2' });
   const typeBox = el('div', { class: 'btn-row' });
+  // Prikazuje se samo kad kategorija ima doslovno uvezena ispitna pitanja.
+  const originBox = el('div');
 
   const aggressivenessValue = el('div', { class: 'small muted mb1',
                                           text: AGGRESSIVENESS_LABELS[state.aggressiveness] });
@@ -77,8 +80,21 @@ export function studySetup(root, categoryId, onStarted) {
   }
 
   const typeCounts = {};
-  api.get(`/api/categories/${categoryId}/questions?limit=1`).then(({ type_counts }) => {
+  api.get(`/api/categories/${categoryId}/questions?limit=1`).then(({ type_counts, origin_counts }) => {
     Object.assign(typeCounts, type_counts);
+    const examCount = (origin_counts || {}).exam || 0;
+    if (examCount) {
+      mount(originBox,
+        el('label', { class: 'checkline mt1' }, [
+          el('input', {
+            type: 'checkbox',
+            onChange: (event) => { state.origin_filter = event.target.checked ? 'exam' : ''; },
+          }),
+          `Samo ispitna pitanja — doslovno iz fajla (${examCount})`,
+        ]),
+        el('div', { class: 'field__hint', text: 'Pitanja iz taba „Ispitna baza": tačno kako pišu u dokumentu, bez AI varijacija.' }),
+      );
+    }
     mount(typeBox, ...Object.entries(typeCounts).map(([key, count]) =>
       el('button', {
         class: 'tool',
@@ -117,6 +133,7 @@ export function studySetup(root, categoryId, onStarted) {
           }),
           'Uključi i sve podkategorije',
         ]),
+        originBox,
         el('div', { class: 'field__label mt1', text: 'Ograniči na tipove (ništa = svi)' }),
         typeBox,
       ]),
@@ -197,7 +214,7 @@ export function runSession(root, sessionId, onFinished) {
         el('div', { class: 'question__type', text: typeLabel(current.type) }),
         el('button', {
           class: 'tool', title: 'Pročitaj naglas', text: '🔊',
-          onClick: () => tts.speak(readable(current)),
+          onClick: () => tts.speak(readable(current, renderer)),
         }),
       ]),
       current.type === 'fill_blank' || current.type === 'cloze_dropdown'
@@ -398,9 +415,10 @@ export function runSession(root, sessionId, onFinished) {
   next();
 }
 
-function readable(question) {
+function readable(question, renderer) {
   const stem = String(question.stem).replace(/\{\{\d+\}\}/g, ' praznina ');
-  const options = question.presentation.options || [];
+  // Cita se redosled SA EKRANA (izmesan), ne originalni iz baze.
+  const options = (renderer && renderer.options) || question.presentation.options || [];
   if (!options.length) return stem;
   return stem + '. ' + options.map((text, index) => `${'ABCDEFGH'[index]}: ${text}`).join('. ');
 }

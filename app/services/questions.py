@@ -48,6 +48,7 @@ def hydrate(row: dict, with_answer: bool = True) -> dict:
         "source_ref": row["source_ref"],
         "variant_group": row["variant_group"],
         "variant_index": row["variant_index"],
+        "origin": row.get("origin") or "ai",
         "state": row["state"],
         "created_at": row.get("created_at"),
         "note": row.get("note") or "",
@@ -74,7 +75,7 @@ def hydrate(row: dict, with_answer: bool = True) -> dict:
 def _presentation(question_type: str, payload: dict) -> dict:
     """Ono sto se sme poslati pre nego sto korisnik odgovori."""
     visible: dict[str, Any] = {}
-    for key in ("options", "items", "left", "right", "unit", "targets"):
+    for key in ("options", "items", "left", "right", "unit", "targets", "shuffle"):
         if key in payload:
             visible[key] = payload[key]
     if "image" in payload:
@@ -117,9 +118,18 @@ def _resolve_image(image: dict) -> dict:
 
 
 def insert_many(
-    category_id: int, run_id: Optional[int], items: list[dict], author: str = "ai"
+    category_id: int,
+    run_id: Optional[int],
+    items: list[dict],
+    author: str = "ai",
+    origin: str = "ai",
 ) -> dict:
-    """Upisi provalidirana pitanja, preskacuci ona koja vec postoje."""
+    """Upisi provalidirana pitanja, preskacuci ona koja vec postoje.
+
+    `origin` je 'ai' ili 'exam'. Stavka sme da nosi i `flags` (npr.
+    {"flag_check_source": True}) - upisu se u question_meta odmah, da pitanje
+    koje treba proveriti bude oznaceno od prvog prikaza.
+    """
     existing = {
         row["content_hash"]
         for row in db.query(
@@ -149,9 +159,13 @@ def insert_many(
                 "content_hash": item["content_hash"],
                 "variant_group": item["variant_group"],
                 "variant_index": item["variant_index"],
+                "origin": origin,
             },
         )
         db.execute("INSERT INTO question_meta (question_id) VALUES (?)", (question_id,))
+        flags = {key: 1 for key in FLAG_FIELDS if (item.get("flags") or {}).get(key)}
+        if flags:
+            db.update("question_meta", question_id, flags, id_column="question_id")
         scheduler.ensure_schedule(question_id, category_id)
         inserted.append(question_id)
 
@@ -164,6 +178,7 @@ def list_for(
     search: str = "",
     question_type: str = "",
     flag: str = "",
+    origin: str = "",
     include_deleted: bool = False,
     include_ignored: bool = True,
     limit: int = 200,
@@ -174,6 +189,10 @@ def list_for(
 
     conditions = [f"q.category_id IN ({', '.join('?' for _ in category_ids)})"]
     params: list = list(category_ids)
+
+    if origin:
+        conditions.append("q.origin = ?")
+        params.append(origin)
 
     if not include_deleted:
         conditions.append("COALESCE(m.deleted_at, '') = ''")
@@ -287,6 +306,51 @@ def edit(question_id: int, values: dict) -> dict:
     return get(question_id)
 
 
+def normalize_script(script: str) -> dict:
+    """Ujednaci pismo u SVIM postojecim pitanjima ('latin' ili 'cyrillic').
+
+    Za korisnike koji vec imaju pola-pola pitanja u bazi od pre popravke:
+    novo generisanje vise ne propusta mesano pismo, ali staro ostaje dok se
+    ovo ne pokrene. Menja samo redove koji se stvarno razlikuju.
+    """
+    from .. import translit
+
+    if script not in ("latin", "cyrillic"):
+        raise HttpError(400, "Pismo mora da bude 'latin' ili 'cyrillic'.")
+
+    changed = 0
+    rows = db.query("SELECT id, type, stem, payload, explanation, topic FROM question")
+    for row in rows:
+        payload = db.json_field(row, "payload")
+        fixed = {
+            "stem": translit.enforce(row["stem"], script),
+            "payload": translit.enforce_deep(payload, script),
+            "explanation": translit.enforce(row["explanation"], script),
+            "topic": translit.enforce(row["topic"], script),
+        }
+        if (
+            fixed["stem"] == row["stem"]
+            and fixed["payload"] == payload
+            and fixed["explanation"] == row["explanation"]
+            and fixed["topic"] == row["topic"]
+        ):
+            continue
+        db.update(
+            "question",
+            row["id"],
+            {
+                "stem": fixed["stem"],
+                "payload": json.dumps(fixed["payload"], ensure_ascii=False),
+                "explanation": fixed["explanation"],
+                "topic": fixed["topic"],
+                "content_hash": contract.content_hash(row["type"], fixed["stem"], fixed["payload"]),
+                "updated_at": _now(),
+            },
+        )
+        changed += 1
+    return {"checked": len(rows), "changed": changed}
+
+
 def purge(question_id: int) -> None:
     """Trajno brisanje. 'deleted' flag je meko brisanje i vraca se."""
     get(question_id, with_answer=False)
@@ -306,6 +370,24 @@ def existing_stems(category_ids: list[int], limit: int = 200) -> list[str]:
         [*category_ids, limit],
     )
     return [row["stem"] for row in rows]
+
+
+def origin_counts(category_ids: list[int]) -> dict:
+    """{'ai': n, 'exam': m} - da ekran za ucenje zna da li nudi filter porekla."""
+    if not category_ids:
+        return {}
+    marks = ", ".join("?" for _ in category_ids)
+    rows = db.query(
+        f"""
+        SELECT q.origin, COUNT(*) AS n FROM question q
+        LEFT JOIN question_meta m ON m.question_id = q.id
+        WHERE q.category_id IN ({marks}) AND q.state = 'active'
+              AND COALESCE(m.deleted_at, '') = ''
+        GROUP BY q.origin
+        """,
+        category_ids,
+    )
+    return {row["origin"]: row["n"] for row in rows}
 
 
 def type_counts(category_ids: list[int]) -> dict:

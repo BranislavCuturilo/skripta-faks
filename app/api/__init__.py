@@ -3,6 +3,7 @@ uvezu pre nego sto server pocne da slusa."""
 
 from . import ai  # noqa: F401
 from . import categories  # noqa: F401
+from . import exam  # noqa: F401
 from . import materials  # noqa: F401
 from . import meta  # noqa: F401
 from . import proposals  # noqa: F401

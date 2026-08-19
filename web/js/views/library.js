@@ -71,6 +71,7 @@ export async function questions(root, categoryId) {
 
 function questionRow(item, refresh) {
   const flags = [];
+  if (item.origin === 'exam') flags.push(el('span', { class: 'badge badge--accent', title: 'doslovno iz ispitne baze', text: 'ispit 1:1' }));
   if (item.flags.flag_review) flags.push(el('span', { class: 'badge badge--warn', text: '🚩' }));
   if (item.flags.flag_check_source) flags.push(el('span', { class: 'badge badge--warn', text: '🔍' }));
   if (item.flags.flag_irrelevant) flags.push(el('span', { class: 'badge', text: '🗑' }));

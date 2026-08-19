@@ -29,7 +29,12 @@ odgovor tacan, a kod ponudjenih odgovora i zasto su ostali netacni.
 gluposti i nikad "nista od navedenog".
 5. Ne ponavljas isto pitanje drugim recima, osim kad se izricito traze \
 varijacije - tada ih oznacavas istim 'variant_group'.
-6. Odgovaras iskljucivo JSON-om po zadatoj semi, bez ijedne reci van JSON-a.\
+6. Odgovaras iskljucivo JSON-om po zadatoj semi, bez ijedne reci van JSON-a.
+7. Jezik i PISMO su zadati u zadatku i vaze za SVAKO polje: tekst pitanja, svi \
+ponudjeni odgovori, objasnjenje i tema. Nikad ne mesas latinicu i cirilicu u \
+istom pitanju, cak i kad je gradivo napisano drugim pismom - tada ga preslovis.
+8. Kod ponudjenih odgovora tacan odgovor stavljas na NASUMICNO mesto, \
+ravnomerno po svim pozicijama. Ne sme pretezno da bude prvi.\
 """
 
 SYSTEM_GRADE = """\
@@ -371,9 +376,70 @@ ZADATAK
 
 def _language_name(code: str) -> str:
     return {
-        "sr": "srpski (latinica)",
-        "sr-cyrl": "srpski (cirilica)",
+        "sr": "srpski, ISKLJUCIVO latinica (nijedno cirilicno slovo, ni u jednom polju)",
+        "sr-cyrl": "srpski, ISKLJUCIVO cirilica (nijedno latinicno slovo osim formula i stranih skracenica)",
         "en": "engleski",
         "de": "nemacki",
         "ru": "ruski",
     }.get(code, code)
+
+
+SYSTEM_TRANSCRIBE = """\
+Ti PREPISUJES gotovu listu ispitnih pitanja iz dostavljenog dokumenta u JSON. \
+Nisi autor pitanja i ne smes nista da menjas.
+
+Pravila koja se ne krse:
+1. Tekst svakog pitanja ('stem') i svaki ponudjeni odgovor prepisujes DOSLOVNO, \
+znak po znak: ne skracujes, ne prepricavas, ne ispravljas gramatiku ni slovne \
+greske, ne dodajes ni jednu rec. Jedino sto izostavljas su oznake nabrajanja \
+ispred teksta ("1.", "a)", "-", "*") i oznake tacnog odgovora.
+2. Ne dodajes pitanja kojih nema u dokumentu i ne izostavljas nijedno koje \
+postoji. Ne pravis varijacije.
+3. Redosled ponudjenih odgovora zadrzavas tacno kao u dokumentu.
+4. Ako u dokumentu pise koji je odgovor tacan (zvezdica, podebljano, kljuc na \
+kraju, "Tacan odgovor: b"), to je tacan odgovor i upisujes "answer_source": \
+"document". Ako dokument NE kaze koji je tacan, odredi ga po svom znanju i \
+upisi "answer_source": "model" - da korisnik zna da to mora da proveri.
+5. Tipovi koje smes da koristis: "mcq_single", "mcq_multi", "true_false", \
+"short_answer" (dokument daje odgovor tekstom), "numeric", "long_answer" \
+(otvoreno pitanje bez odgovora u dokumentu - 'key_points' su tvoji, pa je \
+answer_source "model").
+6. 'explanation' sme da bude prazno. 'source_ref' je broj pitanja iz dokumenta.
+7. Jezik i pismo su oni iz dokumenta - ne prevodis i ne preslovljavas.
+8. Odgovaras iskljucivo JSON-om po zadatoj semi, bez ijedne reci van JSON-a.\
+"""
+
+
+def build_transcription_prompt(*, category_path: str, material: str, has_files: bool = False) -> str:
+    source = (
+        "Pitanja su u PRILOZENIM FAJLOVIMA (sken, slika, PDF). Procitaj ih pazljivo i prepisi "
+        "doslovno.\n" + material
+        if has_files
+        else "DOKUMENT SA PITANJIMA:\n" + "-" * 60 + "\n" + material + "\n" + "-" * 60
+    )
+    return f"""\
+PREDMET / CELINA: {category_path}
+
+ZADATAK: prepisi SVA ispitna pitanja iz dokumenta ispod u JSON, doslovno.
+
+IZLAZNI FORMAT (samo ovo, bez uvoda i bez markdown ograda):
+{{
+  "questions": [
+    {{
+      "type": "mcq_single",
+      "stem": "tekst pitanja, doslovno iz dokumenta",
+      "payload": {{"options": ["doslovno", "doslovno", "doslovno"], "correct_index": 0}},
+      "answer_source": "document",
+      "explanation": "",
+      "difficulty": 2,
+      "topic": "",
+      "source_ref": "pitanje 1"
+    }}
+  ]
+}}
+Polja 'payload' po tipu: mcq_single -> options + correct_index; mcq_multi -> options +
+correct_indices; true_false -> correct (true/false); short_answer -> accepted (lista
+prihvatljivih doslovnih odgovora) + key_points; numeric -> value (+ unit); long_answer ->
+key_points (+ model_answer).
+
+{source}"""

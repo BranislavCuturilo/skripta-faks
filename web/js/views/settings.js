@@ -308,6 +308,27 @@ export async function settings(root) {
             el('option', { value: 'en', text: 'Engleski', selected: values.question_language === 'en' }),
           ])),
         ]),
+        el('div', { class: 'btn-row mt1' }, [
+          el('button', {
+            class: 'btn btn--sm',
+            text: 'Ujednači pismo u postojećim pitanjima',
+            title: 'Pitanja koja su pola latinicom, pola ćirilicom prevodi u pismo izabrano gore',
+            onClick: async (event) => {
+              const button = event.currentTarget;
+              button.disabled = true;
+              try {
+                const result = await api.post('/api/questions/normalize-script', {});
+                toast(`Pregledano ${result.checked} pitanja, ispravljeno ${result.changed}.`, 'good');
+              } catch (error) {
+                toast(error.message, 'bad');
+              } finally {
+                button.disabled = false;
+              }
+            },
+          }),
+          el('span', { class: 'tiny faint',
+                       text: 'Nova pitanja se uvek upisuju u jednom pismu; ovo popravlja ona od ranije.' }),
+        ]),
       ]),
     ]),
 

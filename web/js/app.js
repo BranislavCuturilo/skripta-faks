@@ -7,6 +7,7 @@ import {
   flattenTree, toggleExpanded, expandTo,
 } from './store.js';
 import { overview, materials, generate } from './views/category.js';
+import { examBank } from './views/exam.js';
 import { questions, strategy, notes } from './views/library.js';
 import { settings } from './views/settings.js';
 import { studySetup, runSession } from './views/study.js';
@@ -19,6 +20,7 @@ const TABS = [
   ['uci', 'Uči'],
   ['pitanja', 'Pitanja'],
   ['materijali', 'Materijali'],
+  ['ispit', 'Ispitna baza'],
   ['generisanje', 'Generisanje'],
   ['strategija', 'Strategija'],
   ['dopune', 'Dopune'],
@@ -219,6 +221,7 @@ async function drawCategory(categoryId, tab) {
     pregled: () => overview(body, categoryId, (next) => go(categoryId, next)),
     materijali: () => materials(body, categoryId),
     generisanje: () => generate(body, categoryId),
+    ispit: () => examBank(body, categoryId),
     pitanja: () => questions(body, categoryId),
     strategija: () => strategy(body, categoryId),
     dopune: () => notes(body, categoryId),

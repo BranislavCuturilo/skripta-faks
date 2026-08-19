@@ -10,7 +10,7 @@ import hashlib
 import json
 from typing import Any, Optional
 
-from .. import config, db
+from .. import config, db, translit
 from ..ai import gemini, prompts
 from ..http_util import HttpError
 from ..quiz import grading, scheduler
@@ -29,10 +29,14 @@ def start(category_id: int, options: Optional[dict] = None) -> dict:
     type_filter = options.get("type_filter") or []
     if isinstance(type_filter, str):
         type_filter = [item.strip() for item in type_filter.split(",") if item.strip()]
+    origin_filter = str(options.get("origin_filter") or "").strip()
+    if origin_filter not in ("", "ai", "exam"):
+        raise HttpError(400, "Nepoznat filter porekla pitanja.")
 
     ids = categories.subtree_ids(category_id) if include_subtree else [category_id]
     available = scheduler.pick(
-        ids, limit=length, aggressiveness=aggressiveness, type_filter=type_filter, mode=mode
+        ids, limit=length, aggressiveness=aggressiveness, type_filter=type_filter, mode=mode,
+        origin=origin_filter,
     )
     if not available:
         raise HttpError(
@@ -49,6 +53,7 @@ def start(category_id: int, options: Optional[dict] = None) -> dict:
             "mode": mode,
             "aggressiveness": aggressiveness,
             "type_filter": ",".join(type_filter),
+            "origin_filter": origin_filter,
             "planned_count": len(available),
         },
     )
@@ -72,6 +77,7 @@ def next_question(session_id: int) -> dict:
         session_id=session_id,
         type_filter=[item for item in (session["type_filter"] or "").split(",") if item],
         mode=session["mode"],
+        origin=session.get("origin_filter") or "",
     )
     remaining = max(0, session["planned_count"] - session["asked_count"])
     if not picked or remaining <= 0:
@@ -321,11 +327,13 @@ def _ask_ai(question: dict, answer_text: str, given: dict) -> Optional[dict]:
         score = max(0.0, min(1.0, float(payload.get("score", 0))))
     except (TypeError, ValueError):
         score = 0.0
+    # Isto pravilo kao za pitanja: objasnjenje ne sme da bude pola-pola.
+    script = translit.script_for_language(settings_store.get("ui_language", "sr"))
     return {
         "is_correct": bool(payload.get("is_correct")) and score >= 0.8,
         "score": score,
-        "feedback": str(payload.get("feedback") or "").strip(),
-        "misconception": str(payload.get("misconception") or "").strip()[:160],
+        "feedback": translit.enforce(str(payload.get("feedback") or "").strip(), script),
+        "misconception": translit.enforce(str(payload.get("misconception") or "").strip()[:160], script),
     }
 
 

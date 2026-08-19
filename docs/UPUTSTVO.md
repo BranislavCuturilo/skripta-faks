@@ -182,6 +182,39 @@ Ponekad model ne može da svari format, ili si potrošio kvotu. Tada:
 Nalepljeni odgovor prolazi kroz **potpuno istu proveru** kao Gemini-jev. Ako je
 gradivo veliko, prompt je podeljen na delove — dugme *Sledeći deo →* te vodi kroz njih.
 
+### Ispitna baza — pitanja tačno kako pišu
+
+Ako fakultet deli **fiksnu listu pitanja** (npr. 100 pitanja, na ispitu dođe 20
+od njih, doslovno), generisanje ti ne treba — treba ti da vežbaš **baš ta**
+pitanja, bez AI prepričavanja. Za to je tab **Ispitna baza**.
+
+1. Ubaci fajl sa pitanjima u *Materijali* (PDF, Word, tekst) — ili tekst samo
+   nalepi u polje u tabu
+2. **🔎 Prepoznaj pitanja** — vidiš spisak: koje pitanje, koliko odgovora, koji
+   je označen kao tačan. **Ništa još nije upisano.**
+3. **📥 Uvezi doslovno, bez AI** — pitanja i odgovori ulaze u bazu znak po znak
+   iz dokumenta. Ne troši kvotu i radi bez ključa.
+
+Prepoznaje se uobičajen format: numerisana pitanja (`1.`, `1)`, `Pitanje 1`),
+odgovori `a) b) c)` ili crtice, tačan odgovor označen zvezdicom (`*b)` ili
+`b) ... *`), redom `Tačan odgovor: b`, ili ključem na kraju (`Odgovori:` pa
+`1. b`, `2. c`). Otvoreno pitanje sa `Odgovor: tekst` ispod postaje *kratak
+odgovor*. Dugme *Koji format se prepoznaje?* u tabu pokazuje primer.
+
+**Word i PDF ne čuvaju bold** kad se čitaju kao tekst. Ako je tačan odgovor
+označen samo podebljanim slovima, dodaj zvezdice ili ključ na kraju — ili:
+
+**🤖 AI prepiše doslovno** — za nesređene fajlove i skenove. Gemini prepisuje,
+ali aplikacija **svako pitanje proverava u tekstu fajla**: ako tekst pitanja ili
+neki odgovor nije nađen doslovno, pitanje se odbija i vidiš ga u izveštaju. Kad
+dokument ne kaže koji je odgovor tačan pa ga model odredi sam, pitanje dobija
+oznaku 🔍 *provera u fajlu* — da znaš šta da proveriš.
+
+Uvezena pitanja u tabu *Pitanja* nose oznaku **ispit 1:1**. U tabu *Uči* se
+pojavi kvadratić **„Samo ispitna pitanja"** — uključi ga kad hoćeš da vežbaš
+samo njih. Redosled ponuđenih odgovora ostaje kao u dokumentu (podesivo pri
+uvozu); kod AI-generisanih pitanja redosled se meša pri svakom prikazu.
+
 ## 9. Učenje
 
 Tab **Uči** → podesiš način i pritisneš *Počni sesiju*.
@@ -266,4 +299,7 @@ prekopiraj i njega i celu aplikaciju.
 | PDF je „ide AI-u", a ima tekst | Skeniran je, ili koristi font bez mape znakova. Aplikacija to prepoznaje i šalje original — radi, samo troši više kvote. |
 | Telefon ne može da otvori | Firewall (vidi poglavlje 10), ili telefon nije na istom Wi-Fi-ju. |
 | Nema srpskog glasa | Windows: *Settings → Time & Language → Speech → Add voices*. Ili prebaci izgovor na *Gemini glas*. |
+| U crnom prozoru piše `ConnectionResetError ... forcibly closed by the remote host` | Telefon ili browser je prekinuo vezu (zaključan ekran, zatvoren tab). Nije greška — novije verzije to više ni ne ispisuju. |
+| Pitanje je pola latinicom, pola ćirilicom | Model nije poslušao uputstvo. Nova pitanja se sada uvek upisuju u jednom pismu; za stara pritisni *Podešavanja → Ujednači pismo u postojećim pitanjima*. |
+| Tačan odgovor je „uvek prvi ponuđeni" | Bilo je tako u starijoj verziji; sada se redosled ponuđenih meša pri svakom prikazu. Za doslovno uvezena ispitna pitanja redosled ostaje kao u dokumentu, osim ako pri uvozu ne isključiš tu opciju. |
 | Hoću nešto što aplikacija ne ume | Tab **Predlozi** — vidi [predlozi/README.md](../predlozi/README.md). |

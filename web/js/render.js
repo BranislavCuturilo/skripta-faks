@@ -23,6 +23,25 @@ export function renderQuestion(question) {
 
 const LETTERS = 'ABCDEFGHIJ';
 
+// Redosled prikaza ponudjenih odgovora. Model tacan odgovor stavlja na prvo
+// mesto mnogo cesce nego sto bi trebalo ("uglavnom je tacan prvi ponudjeni"),
+// pa se redosled mesa pri SVAKOM prikazu. Server i ocenjivanje vide samo
+// originalne indekse: `order[pozicija na ekranu] = originalni indeks`.
+export function shuffledOrder(count, enabled = true) {
+  const order = Array.from({ length: count }, (_, index) => index);
+  if (!enabled || count < 2) return order;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    for (let i = count - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    // Identitet je jedini redosled koji bi odao da nista nije izmesano
+    // (npr. stavke za redjanje koje je model vec dao u tacnom redosledu).
+    if (order.some((value, index) => value !== index)) break;
+  }
+  return order;
+}
+
 function imageNode(image) {
   if (!image || !image.url) return null;
   return el('figure', { style: { margin: '0 0 16px' } }, [
@@ -35,7 +54,11 @@ function imageNode(image) {
 
 function choiceRenderer({ multiple = false } = {}) {
   return (question) => {
-    const options = question.presentation.options || [];
+    const original = question.presentation.options || [];
+    const order = shuffledOrder(original.length, question.presentation.shuffle !== false);
+    const options = order.map((index) => original[index]);
+    // `picked` nosi POZICIJE na ekranu; u originalne indekse se prevodi tek
+    // pri slanju i pri otkrivanju tacnog.
     const picked = new Set();
     const rows = [];
 
@@ -66,16 +89,19 @@ function choiceRenderer({ multiple = false } = {}) {
 
     return {
       node: el('div', {}, [imageNode(question.presentation.image), box]),
-      collect: () => (multiple ? { indices: [...picked] } : { index: picked.size ? [...picked][0] : null }),
+      options,
+      collect: () => (multiple
+        ? { indices: [...picked].map((position) => order[position]) }
+        : { index: picked.size ? order[[...picked][0]] : null }),
       reveal: (result) => {
         const payload = result.payload || {};
         const correct = multiple
           ? new Set(payload.correct_indices || [])
           : new Set([payload.correct_index]);
-        rows.forEach((row, index) => {
+        rows.forEach((row, position) => {
           row.style.pointerEvents = 'none';
-          if (correct.has(index)) row.classList.add('is-right');
-          else if (picked.has(index)) row.classList.add('is-wrong');
+          if (correct.has(order[position])) row.classList.add('is-right');
+          else if (picked.has(position)) row.classList.add('is-wrong');
         });
       },
     };
@@ -130,10 +156,13 @@ function blankRenderer(kind) {
         const id = marker[1];
         const blank = blanks.find((item) => String(item.id) === id) || { id };
 
+        const choices = blank.options || [];
         const input = kind === 'select'
           ? el('select', { class: 'blank', style: { minWidth: '150px' } }, [
               el('option', { value: '', text: '— izaberi —' }),
-              ...(blank.options || []).map((text, index) => el('option', { value: String(index), text })),
+              // Vrednost je originalni indeks, prikaz je izmesan.
+              ...shuffledOrder(choices.length).map((index) =>
+                el('option', { value: String(index), text: choices[index] })),
             ])
           : el('input', { type: 'text', class: 'blank', placeholder: blank.hint || `${id}`,
                           autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
@@ -204,12 +233,14 @@ RENDERERS.numeric = (question) => {
 RENDERERS.match_pairs = (question) => {
   const left = question.presentation.left || [];
   const right = question.presentation.right || [];
+  // Model desnu kolonu cesto vrati u istom redosledu kao levu (1-1, 2-2...).
+  const rightOrder = shuffledOrder(right.length);
   const selects = [];
 
   const node = el('div', { class: 'pairs' }, left.map((text, index) => {
     const select = el('select', {}, [
       el('option', { value: '', text: '— izaberi —' }),
-      ...right.map((option, position) => el('option', { value: String(position), text: option })),
+      ...rightOrder.map((position) => el('option', { value: String(position), text: right[position] })),
     ]);
     selects.push(select);
     return el('div', { class: 'pair' }, [
@@ -234,7 +265,8 @@ RENDERERS.match_pairs = (question) => {
 
 RENDERERS.order_sequence = (question) => {
   const items = question.presentation.items || [];
-  let order = items.map((_, index) => index);
+  // Pocetni redosled je izmesan - model ume da vrati stavke vec poredjane.
+  let order = shuffledOrder(items.length);
   const list = el('div', { class: 'sortable' });
 
   const draw = () => {

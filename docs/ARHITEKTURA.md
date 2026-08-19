@@ -160,6 +160,39 @@ raste.
 Registar se šalje i modelu u promptu, pa je tačnost registra direktno tačnost
 generisanih pitanja.
 
+### Ono što ulazi u bazu prolazi kroz filter pisma, ne kroz nadu
+
+Model dobije „piši latinicom" i vrati pola pitanja ćirilicom — naročito kad je
+gradivo ćirilično. Uputstvo u promptu je pojačano, ali garancija je
+`app/translit.py`: `contract.validate_one(item, script=...)` preslovljava svako
+tekstualno polje pre nego što se izračuna otisak i pre upisa. Ćirilica →
+latinica je 1:1; latinica → ćirilica ide po rečima i preskače formule, jedinice
+i strane reči (`H2O`, `kg`, `Windows`). Isti filter ide preko AI ocene odgovora.
+Usput je popravljen i otisak pitanja (`content_hash`), koji je do tada bacao sva
+neASCII slova — dva različita ćirilična pitanja su imala isti otisak i drugo je
+tiho nestajalo kao „duplikat".
+
+### Redosled ponuđenih odgovora se meša u browseru, ne u bazi
+
+Model stavlja tačan odgovor na prvo mesto mnogo češće nego što bi trebalo.
+`payload.shuffle` je postojao od početka, ali ga niko nije čitao. Mešanje je u
+`web/js/render.js` (`shuffledOrder`) pri svakom prikazu; server i ocenjivanje
+vide samo originalne indekse, pa stara pitanja u bazi dobijaju popravku bez
+migracije. Doslovno uvezena ispitna pitanja nose `shuffle: false` (redosled kao
+u dokumentu), osim ako korisnik pri uvozu ne kaže drugačije.
+
+### Ispitna baza: parser pre modela, model pod nadzorom teksta
+
+Zahtev „fiksna lista pitanja, 1:1 kao na ispitu" je suprotan generisanju: tu AI
+ne sme ništa da piše. `app/extract/exam_parser.py` prepoznaje numerisana pitanja,
+`a) b) c)` odgovore i oznaku tačnog bez ijednog poziva, a
+`app/services/exam_import.py` ih upisuje sa `question.origin = 'exam'`. Drugi
+režim pušta Gemini da prepiše nesređen fajl, ali onda svako pitanje i svaki
+odgovor moraju da se nađu **doslovno** u lokalno pročitanom tekstu — šta nije
+nađeno, odbija se sa razlogom. Odgovor koji je odredio model (dokument ga nije
+imao) nosi `flag_check_source` od prvog prikaza. Sesija učenja ima
+`origin_filter` da se vežbaju samo ta pitanja.
+
 ## Bezbednost, koliko je lokalnoj aplikaciji potrebno
 
 Server sluša na `0.0.0.0` — to je ono što omogućava telefon na istom Wi-Fi-ju.
