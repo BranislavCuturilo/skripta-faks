@@ -21,3 +21,6 @@ desktop.ini
 # Lokalna podesavanja koja mogu da sadrze kljuceve
 *.local.json
 secrets.json
+
+# Staging folder samo-azuriranja: preuzeta verzija koja ceka restart.
+.update/

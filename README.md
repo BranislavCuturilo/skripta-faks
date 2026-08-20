@@ -11,21 +11,43 @@ bas to.
 Ako fakultet deli fiksnu listu ispitnih pitanja, tab **Ispitna baza** je uveze
 doslovno — bez AI prepravljanja — pa vezbas tacno ta pitanja.
 
-## Sta ti treba
+## Instalacija (Windows)
 
-Samo **Python 3.11+**. Nista drugo — nema `pip install`, nema `requirements.txt`.
-Celu aplikaciju cini standardna biblioteka: `http.server`, `sqlite3`, `urllib`,
-`zipfile`, `zlib`, `xml`.
+Skini **[instaliraj.bat](https://github.com/BranislavCuturilo/skripta-faks/raw/main/instaliraj.bat)**
+i klikni dupli klik na njega. To je sve.
+
+Instalacija sama: instalira Python ako ga nema, skine aplikaciju, napravi
+ikonicu na desktopu i pokrene je.
+
+> Windows ce verovatno reci *„Windows protected your PC"* — to kaze za svaki
+> `.bat` skinut sa interneta, ne znaci da nesto nije u redu. Klikni **More
+> info** → **Run anyway**.
+
+Posle toga aplikaciju pokreces ikonicom **skripta-faks** na desktopu.
+
+### Rucno, ako ti je tako draze
+
+Treba ti samo **Python 3.11+**. Nista drugo — nema `pip install`, nema
+`requirements.txt`. Celu aplikaciju cini standardna biblioteka: `http.server`,
+`sqlite3`, `urllib`, `zipfile`, `zlib`, `xml`.
+
+Skini ZIP repozitorijuma, raspakuj ga i klikni na `START.bat`. Otvorice se
+browser na `http://localhost:8077`.
+
+### Gemini kljuc
 
 Za AI funkcije treba ti besplatan **Gemini API kljuc**
 (https://aistudio.google.com/apikey) — unosis ga u aplikaciji, u tabu Podesavanja.
 
-## Pokretanje
+## Azuriranje
 
-Dupli klik na `START.bat`. Otvorice se browser na `http://localhost:8077`.
+U aplikaciji: **Podesavanja → Verzija i azuriranje → Preuzmi i azuriraj**.
 
-Da napravis ikonicu na desktopu: desni klik na `START.bat` → Send to → Desktop
-(create shortcut).
+Nova verzija se preuzme odmah, a ugradi se pri sledecem pokretanju — dok
+aplikacija radi, drzi svoje fajlove otvorene i ne moze da ih prepise ispod
+sebe. Znaci: klikni preuzmi, zatvori aplikaciju, pokreni je ponovo.
+
+Tvoja pitanja, materijali i napredak se pri azuriranju ne diraju.
 
 ## Ucenje sa telefona
 

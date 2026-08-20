@@ -10,3 +10,4 @@ from . import proposals  # noqa: F401
 from . import questions  # noqa: F401
 from . import settings  # noqa: F401
 from . import study  # noqa: F401
+from . import update  # noqa: F401

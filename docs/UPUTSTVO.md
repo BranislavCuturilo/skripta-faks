@@ -5,9 +5,25 @@ dugme **Uputstvo** u levoj koloni.
 
 ---
 
-## 1. Šta ti treba
+## 1. Instalacija
 
-Samo **Python 3.11 ili noviji**. Ništa drugo — nema `pip install`.
+Skini **`instaliraj.bat`** sa
+<https://github.com/BranislavCuturilo/skripta-faks/raw/main/instaliraj.bat>
+i klikni dupli klik na njega.
+
+To je ceo posao. Instalacija sama proveri imaš li Python, instalira ga ako
+nemaš, skine aplikaciju, napravi ikonicu na desktopu i pokrene je.
+
+**Windows će te uplašiti jednom porukom.** Piše *„Windows protected your PC"*.
+To piše za svaki `.bat` fajl skinut sa interneta — ne znači da nešto nije u
+redu. Klikni **More info**, pa **Run anyway**.
+
+Instalira se u `C:\Users\<ti>\AppData\Local\skripta-faks`. Ne traži
+administratorsku lozinku.
+
+### Ako više voliš ručno
+
+Treba ti samo **Python 3.11 ili noviji**. Ništa drugo — nema `pip install`.
 
 Proveri da li ga već imaš: otvori *Command Prompt* i ukucaj
 
@@ -20,16 +36,15 @@ Ako piše verzija — gotovo. Ako piše da komanda nije pronađena, skini ga sa
 na prvom ekranu instalacije. To je jedini korak koji ljudi preskoče, a bez njega
 `START.bat` ne radi.
 
+Onda skini ZIP repozitorijuma, raspakuj ga gde želiš, i klikni na `START.bat`.
+
 ## 2. Pokretanje
 
-Dupli klik na **`START.bat`** u folderu aplikacije.
+Dupli klik na ikonicu **skripta-faks** na desktopu (ili na `START.bat` u
+folderu aplikacije, ako si instalirao ručno).
 
 Otvoriće se crni prozor (to je server — mora da ostane otvoren dok učiš) i
 browser na `http://localhost:8077`.
-
-**Ikonica na desktopu:** desni klik na `START.bat` → *Show more options* →
-*Send to* → *Desktop (create shortcut)*. Ikonicu možeš da preimenuješ i da joj
-promeniš sliku kroz *Properties → Change Icon*.
 
 **Gašenje:** zatvori crni prozor, ili pritisni `Ctrl+C` u njemu.
 
@@ -275,7 +290,23 @@ verziju. Svaka verzija se čuva sa obrazloženjem i **vraća jednim klikom**.
 Tab **Dopune**: kad se u učenju vidi rupa koja se ponavlja, AI ti napiše kratku
 dopunu baš za te tačke. Originalni materijali se ne diraju.
 
-## 12. Bekap
+## 12. Ažuriranje
+
+**Podešavanja → Verzija i ažuriranje → Preuzmi i ažuriraj.**
+
+Aplikacija sama proveri ima li novije verzije. Ako ima, preuzme je odmah — ali
+je **ugradi tek pri sledećem pokretanju**. Razlog je prozaičan: dok radi,
+aplikacija drži svoje fajlove otvorene i ne može da ih prepiše ispod sebe.
+
+Znači, tri koraka: klikni *Preuzmi*, zatvori crni prozor, pokreni ponovo.
+Pri pokretanju piše `Ugradjujem novu verziju...` i to je gotovo za sekundu.
+
+> Tvoja pitanja, materijali i napredak se **ne diraju**. Ažurira se samo kod
+> aplikacije. Folder `data/` ne dodiruje ni instalacija ni ažuriranje.
+
+Ako se predomisliš pre restarta, dugme *Odustani* obriše preuzeto.
+
+## 13. Bekap
 
 Sve tvoje je u folderu **`data/`**:
 
@@ -285,7 +316,7 @@ Sve tvoje je u folderu **`data/`**:
 Bekap = kopiraj taj folder. Vraćanje = vrati ga nazad. Prenos na drugi računar =
 prekopiraj i njega i celu aplikaciju.
 
-## 13. Kad nešto ne radi
+## 14. Kad nešto ne radi
 
 | Simptom | Šta je |
 |---|---|
@@ -302,4 +333,6 @@ prekopiraj i njega i celu aplikaciju.
 | U crnom prozoru piše `ConnectionResetError ... forcibly closed by the remote host` | Telefon ili browser je prekinuo vezu (zaključan ekran, zatvoren tab). Nije greška — novije verzije to više ni ne ispisuju. |
 | Pitanje je pola latinicom, pola ćirilicom | Model nije poslušao uputstvo. Nova pitanja se sada uvek upisuju u jednom pismu; za stara pritisni *Podešavanja → Ujednači pismo u postojećim pitanjima*. |
 | Tačan odgovor je „uvek prvi ponuđeni" | Bilo je tako u starijoj verziji; sada se redosled ponuđenih meša pri svakom prikazu. Za doslovno uvezena ispitna pitanja redosled ostaje kao u dokumentu, osim ako pri uvozu ne isključiš tu opciju. |
+| Ažurirao sam, a ništa se nije promenilo | Nisi ponovo pokrenuo aplikaciju. Zatvori crni prozor i klikni ikonicu opet. |
+| „Windows protected your PC" pri instalaciji | Normalno za `.bat` sa interneta. *More info* → *Run anyway*. |
 | Hoću nešto što aplikacija ne ume | Tab **Predlozi** — vidi [predlozi/README.md](../predlozi/README.md). |

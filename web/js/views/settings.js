@@ -5,6 +5,7 @@ import { el, mount, field, toast, when } from '../dom.js';
 import { store, saveSettings } from '../store.js';
 import * as tts from '../tts.js';
 import { networkCard } from './network.js';
+import { updateCard } from './update.js';
 
 export async function settings(root) {
   const values = store.settings;
@@ -338,6 +339,8 @@ export async function settings(root) {
       el('div', { class: 'card__head' }, ['Potrošnja AI poziva']),
       el('div', { class: 'card__body' }, [usageBox]),
     ]),
+
+    updateCard(),
 
     el('div', { class: 'center faint tiny mt2',
                 text: `skripta-faks ${store.version} · sve radi lokalno, bez ijedne biblioteke` }),

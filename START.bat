@@ -6,6 +6,10 @@ cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 set PYTHONUTF8=1
 
+rem  Ako je nova verzija preuzeta iz aplikacije, ugradjuje se ovde - dok Python
+rem  jos nije startovao i dok nijedan .py fajl nije zauzet.
+if exist "azuriraj.bat" call "azuriraj.bat"
+
 where py >nul 2>nul
 if %errorlevel%==0 (
     py -3 run.py

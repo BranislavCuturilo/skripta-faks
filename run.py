@@ -14,6 +14,16 @@ for stream in (sys.stdout, sys.stderr):
     if hasattr(stream, "reconfigure"):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
+# Ugradnja preuzete verzije mora da se desi PRE uvoza ostatka aplikacije: posle
+# uvoza je stari kod vec u memoriji, pa bi se do restarta izvrsavala verzija
+# koja vise ne stoji na disku. Na Windows-u ovo obicno nema sta da nadje -
+# tamo posao odradi azuriraj.bat, jos ranije.
+from app.services import updater  # noqa: E402
+
+_installed = updater.install_pending()
+if _installed:
+    print(f"  Ugradjena nova verzija: {_installed.get('version', '?')}")
+
 from app import config, db, netinfo, server  # noqa: E402  - uvoz servera registruje i rute
 
 
