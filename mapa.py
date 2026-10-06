@@ -94,6 +94,7 @@ FOOTER = """
 | dodam novi tip pitanja | `app/quiz/types.py` (registar + validator), `app/quiz/grading.py` (ocenjivač), `web/js/render.js` (crtanje) — sva tri, uvek |
 | promenim kako se bira sledeće pitanje | `app/quiz/scheduler.py` |
 | promenim šta se šalje modelu | `app/ai/prompts.py` |
+| promenim koliko dugo se čeka na AI ocenu | konstante `GRADE_*` na vrhu `app/services/study.py` |
 | dodam kolonu ili tabelu | nova migracija na kraj `MIGRATIONS` u `app/db.py` |
 | dodam ekran | `web/js/views/*.js` + ruta u `web/js/app.js` (`TABS` ili `route()`) |
 | dodam API rutu | `app/api/*.py` (tanko) + `app/services/*.py` (logika) |

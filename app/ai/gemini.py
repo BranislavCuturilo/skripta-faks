@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .. import db
+from . import models
 
 # Poslednja linija odbrane, nezavisna od konfiguracije: kad je postavljeno,
 # nijedan poziv ne izlazi iz procesa. Testovi ga pale u run_tests.py, pa suite
@@ -30,6 +31,7 @@ INLINE_LIMIT_BYTES = 4 * 1024 * 1024
 
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 MAX_ATTEMPTS = 4
+DEFAULT_TIMEOUT_S = 300.0
 
 
 class AiError(Exception):
@@ -51,8 +53,16 @@ def generate(
     temperature: float = 0.7,
     max_output_tokens: int = 32768,
     purpose: str = "generate",
+    thinking: str = "",
+    timeout_s: float = DEFAULT_TIMEOUT_S,
+    max_attempts: int = MAX_ATTEMPTS,
 ) -> dict:
-    """Jedan poziv modelu. Vraca {text, prompt_tokens, output_tokens, model}."""
+    """Jedan poziv modelu. Vraca {text, prompt_tokens, output_tokens, model}.
+
+    Podrazumevano je strpljivo (dug timeout, vise pokusaja) - za poslove u
+    pozadini. Ono sto student ceka pred ekranom zadaje `timeout_s`,
+    `max_attempts` i `thinking="low"`.
+    """
     if not api_key:
         raise AiError("Nije unet Gemini API kljuc (Podesavanja -> AI).")
 
@@ -71,12 +81,24 @@ def generate(
         body["generationConfig"]["responseMimeType"] = "application/json"
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
+    thinking_config = models.thinking_config(model, thinking)
+    if thinking_config:
+        body["generationConfig"]["thinkingConfig"] = thinking_config
 
+    url = f"{BASE_URL}/models/{model}:generateContent"
     started = time.monotonic()
     error_text = ""
     status_code = None
     try:
-        payload = _post_json(f"{BASE_URL}/models/{model}:generateContent", api_key, body)
+        try:
+            payload = _post_json(url, api_key, body, timeout_s, max_attempts)
+        except AiError as exc:
+            # Model koji ne zna za to polje vraca 400 - sporiji odgovor je
+            # bolji od nikakvog, pa jos jednom bez njega.
+            if not (thinking_config and exc.status == 400 and "thinking" in exc.message.lower()):
+                raise
+            del body["generationConfig"]["thinkingConfig"]
+            payload = _post_json(url, api_key, body, timeout_s, max_attempts)
         text = _first_text(payload)
         usage = payload.get("usageMetadata") or {}
         result = {
@@ -213,34 +235,41 @@ def _file_part(item: dict) -> dict:
     }
 
 
-def _post_json(url: str, api_key: str, body: dict) -> dict:
-    return _request("POST", url, api_key, json.dumps(body, ensure_ascii=False).encode("utf-8"))
+def _post_json(
+    url: str, api_key: str, body: dict,
+    timeout_s: float = DEFAULT_TIMEOUT_S, max_attempts: int = MAX_ATTEMPTS,
+) -> dict:
+    data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    return _request("POST", url, api_key, data, timeout_s, max_attempts)
 
 
-def _request(method: str, url: str, api_key: str, data: Optional[bytes] = None) -> dict:
+def _request(
+    method: str, url: str, api_key: str, data: Optional[bytes] = None,
+    timeout_s: float = DEFAULT_TIMEOUT_S, max_attempts: int = MAX_ATTEMPTS,
+) -> dict:
     headers = {"x-goog-api-key": api_key, "Content-Type": "application/json; charset=utf-8"}
     request = urllib.request.Request(url, method=method, data=data, headers=headers)
 
     delay = 1.5
     last: Optional[AiError] = None
-    for attempt in range(MAX_ATTEMPTS):
+    for attempt in range(max_attempts):
         try:
-            with _open(request) as response:
+            with _open(request, timeout_s) as response:
                 return json.loads(response.read().decode("utf-8"))
         except AiError as exc:
             last = exc
-            if not exc.retryable or attempt == MAX_ATTEMPTS - 1:
+            if not exc.retryable or attempt == max_attempts - 1:
                 raise
             time.sleep(delay)
             delay *= 2
     raise last or AiError("Poziv nije uspeo.")
 
 
-def _open(request: urllib.request.Request):
+def _open(request: urllib.request.Request, timeout_s: float = DEFAULT_TIMEOUT_S):
     if os.environ.get(NETWORK_BLOCKED_ENV):
         raise AiError("Mrezni pozivi su blokirani (SKRIPTA_BLOCK_NETWORK).", status=0)
     try:
-        return urllib.request.urlopen(request, timeout=300)
+        return urllib.request.urlopen(request, timeout=timeout_s)
     except urllib.error.HTTPError as exc:
         detail = ""
         try:

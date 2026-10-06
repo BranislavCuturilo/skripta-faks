@@ -17,6 +17,10 @@ from ..quiz import grading, scheduler
 from ..quiz import types as question_types
 from . import ai_models, categories, questions, settings_store, strategy
 
+GRADE_TIMEOUT_S = 30.0
+GRADE_TIMEOUT_PHOTO_S = 90.0
+GRADE_MAX_ATTEMPTS = 2
+
 
 def start(category_id: int, options: Optional[dict] = None) -> dict:
     options = options or {}
@@ -306,8 +310,14 @@ def _ask_ai(question: dict, answer_text: str, given: dict) -> Optional[dict]:
             files=files,
             json_output=True,
             temperature=0.2,
-            max_output_tokens=2048,
+            max_output_tokens=4096,
             purpose="grade",
+            # Student ceka pred ekranom. Foto-postupak sme da razmisli i da
+            # traje duze; tekst ne - posle toga je bolje reci "uporedi sam"
+            # nego drzati spinner dva minuta kroz cetiri pokusaja.
+            thinking="" if photo_path else "low",
+            timeout_s=GRADE_TIMEOUT_PHOTO_S if photo_path else GRADE_TIMEOUT_S,
+            max_attempts=GRADE_MAX_ATTEMPTS,
         )
     except gemini.AiError:
         # Ocenjivanje ne sme da obori odgovor: pozivalac tada prikaze tacan

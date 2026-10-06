@@ -96,6 +96,27 @@ def is_retired(name: str) -> bool:
     return version is not None and version < 3.0
 
 
+def thinking_config(name: str, level: str) -> Optional[dict]:
+    """`thinkingConfig` koji trazi "malo razmisljanja" od datog modela.
+
+    Gemini 2.5+ podrazumevano razmislja pre odgovora, i to razmisljanje ide u
+    `maxOutputTokens`. Kod ocenjivanja je to bilo i sporo (desetine sekundi) i
+    opasno: misli pojedu budzet, JSON izadje odsecen i provera padne. Dve
+    generacije imaju razlicito polje za isto, pa se bira po verziji.
+    """
+    if level != "low":
+        return None
+    version = _version_of(name)
+    if version is None:
+        return None
+    if version >= 3.0:
+        return {"thinkingLevel": "low"}
+    if version >= 2.5:
+        # 2.5 pro ne moze da iskljuci razmisljanje - 128 je najmanje sto prima.
+        return {"thinkingBudget": 128 if "pro" in name.lower() else 0}
+    return None
+
+
 def _fits(tier: str, name: str) -> bool:
     lowered = name.lower()
     if tier == "tts":

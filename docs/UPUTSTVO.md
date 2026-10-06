@@ -95,6 +95,8 @@ Aplikacija je pravljena da to štedi:
 - **odgovori se ocenjuju lokalno kad god mogu** — AI ulazi u igru samo za dopunu
   rečenice koja je promašena, za duži odgovor i za foto-zadatke
 - **isti pogrešan odgovor drugi put ne košta ništa** — objašnjenje se pamti
+- **ocena otvorenog odgovora stiže za nekoliko sekundi** — ako Google ne odgovori
+  ni posle pola minuta, aplikacija ne čeka dalje: pokaže tačan odgovor da uporediš sam
 
 U **Podešavanja → Potrošnja AI poziva** vidiš tačno koliko je poziva otišlo i na šta.
 

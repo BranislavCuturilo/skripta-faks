@@ -227,3 +227,60 @@ class AutoRemapTests(AppTestCase):
         for status, message in ((429, "Quota exceeded"), (500, "Internal"), (0, "blokirani")):
             error = gemini.AiError(message, status=status)
             self.assertFalse(ai_models._looks_like_missing_model(error), message)
+
+
+class ThinkingTests(AppTestCase):
+    """Ocenjivanje otvorenog odgovora je trajalo i po dva minuta: model je
+    podrazumevano razmisljao, a cetiri pokusaja sa timeout-om od 300 s nisu
+    imala gornju granicu koju student moze da saceka. Ovo pinuje da se
+    razmisljanje stisava po pravom polju za svaku generaciju."""
+
+    def test_new_family_uses_thinking_level(self):
+        self.assertEqual(models.thinking_config("gemini-3.6-flash", "low"), {"thinkingLevel": "low"})
+
+    def test_old_flash_turns_thinking_off(self):
+        self.assertEqual(models.thinking_config("gemini-2.5-flash", "low"), {"thinkingBudget": 0})
+
+    def test_old_pro_gets_the_minimum_it_accepts(self):
+        self.assertEqual(models.thinking_config("gemini-2.5-pro", "low"), {"thinkingBudget": 128})
+
+    def test_default_leaves_the_model_alone(self):
+        self.assertIsNone(models.thinking_config("gemini-3.6-flash", ""))
+        self.assertIsNone(models.thinking_config("nepoznat-model", "low"))
+
+
+class GenerateRequestTests(AppTestCase):
+    def setUp(self):
+        super().setUp()
+        self.sent = []
+        self._real_post = gemini._post_json
+        gemini._post_json = self._fake_post
+        self.reject_thinking = False
+
+    def tearDown(self):
+        gemini._post_json = self._real_post
+        super().tearDown()
+
+    def _fake_post(self, url, api_key, body, timeout_s, max_attempts):
+        config = json.loads(json.dumps(body["generationConfig"]))
+        self.sent.append({"config": config, "timeout_s": timeout_s, "max_attempts": max_attempts})
+        if self.reject_thinking and "thinkingConfig" in config:
+            raise gemini.AiError("Unknown field thinkingConfig.thinkingLevel", status=400)
+        return {"candidates": [{"content": {"parts": [{"text": "{}"}]}}]}
+
+    def test_interactive_call_sends_limits_and_low_thinking(self):
+        gemini.generate("k", "gemini-3.6-flash", "p", thinking="low", timeout_s=30, max_attempts=2)
+        self.assertEqual(self.sent[0]["config"]["thinkingConfig"], {"thinkingLevel": "low"})
+        self.assertEqual((self.sent[0]["timeout_s"], self.sent[0]["max_attempts"]), (30, 2))
+
+    def test_background_call_is_unchanged(self):
+        gemini.generate("k", "gemini-3.6-flash", "p")
+        self.assertNotIn("thinkingConfig", self.sent[0]["config"])
+        self.assertEqual(self.sent[0]["max_attempts"], gemini.MAX_ATTEMPTS)
+
+    def test_model_that_rejects_thinking_is_asked_again_without_it(self):
+        self.reject_thinking = True
+        result = gemini.generate("k", "gemini-3.6-flash", "p", thinking="low")
+        self.assertEqual(len(self.sent), 2)
+        self.assertNotIn("thinkingConfig", self.sent[1]["config"])
+        self.assertEqual(result["text"], "{}")

@@ -133,6 +133,17 @@ odgovor drugi put ne košta ništa.
 
 Prazan odgovor nikad ne zove AI — netačan je bez razmišljanja.
 
+Ocenjivanje se radi dok student čeka pred ekranom, pa ima sopstvena ograničenja
+(`GRADE_*` u `app/services/study.py`): model dobija `thinking="low"`, poziv ima
+kratak timeout i najviše dva pokušaja. Bez toga je Gemini 2.5+/3.x podrazumevano
+„razmišljao" desetinama sekundi, razmišljanje je jelo `maxOutputTokens` i sekao
+JSON, a četiri pokušaja po 300 s su značila i po dva minuta spinera. Polje za
+razmišljanje se razlikuje po generaciji (`thinkingLevel` / `thinkingBudget`) i
+bira ga `models.thinking_config()`; model koji ga ne prihvati (400) dobije isti
+zahtev još jednom bez njega. Foto-zadaci razmišljaju normalno i čekaju duže.
+Poslovi u pozadini (generisanje, prepis ispita) i dalje rade sa strpljivim
+podrazumevanim vrednostima.
+
 ### Isti ugovor za Gemini i za ručno nalepljen odgovor
 
 `app/ai/contract.py` je jedini put kojim pitanja ulaze u bazu. Kad Gemini ne može
