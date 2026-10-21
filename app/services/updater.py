@@ -460,7 +460,7 @@ def main() -> int:
         print(f"  [X] {state['error']}")
         return 1
     if not state["available"]:
-        print(f"  Vec imas najnoviju verziju ({state['current']}).")
+        print(f"  Vec imas najnoviju verziju (commit {state.get('installed', '')[:7] or 'nepoznat'}).")
         return 0
     print(f"  Preuzimam verziju {state['latest']}")
     try:

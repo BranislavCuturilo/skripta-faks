@@ -177,7 +177,7 @@ class ManualRunTest(UpdaterTestCase):
     """`azuriraj.bat` pokrenut duplim klikom u ZIP instalaciji."""
 
     def test_up_to_date_prepares_nothing(self):
-        state = {"error": "", "available": False, "current": "0.1.0 · bbbbbbb"}
+        state = {"error": "", "available": False, "installed": NEW}
         with mock.patch.object(updater, "check", return_value=state), \
                 mock.patch.object(updater, "prepare") as prepare:
             self.assertEqual(updater.main(), 0)
