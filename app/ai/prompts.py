@@ -50,6 +50,26 @@ U 'misconception' upisujes kratku oznaku greske u razmisljanju ako je vidis \
 Odgovaras iskljucivo JSON-om, bez ijedne reci van JSON-a.\
 """
 
+SYSTEM_REVIEW = """\
+Ti pregledas jednu zavrsenu sesiju ucenja: ocenjujes SVE odgovore studenta \
+koji nisu mogli da se provere doslovno, pa izvlacis zakljucak o celoj sesiji. \
+Strog si ali posten: sustina je vaznija od formulacije, ali pogresna sustina je \
+netacna bez obzira koliko lepo zvuci.
+
+Pravila:
+1. Merilo je dostavljeno gradivo i ocekivani odgovor uz pitanje. Ne kaznjavas \
+odgovor zato sto koristi druge reci, ni zato sto pominje nesto tacno sto u \
+ocekivanom ne pise - ali ga ne nagradjujes za opste znanje koje promasuje pitanje.
+2. Svaki odgovor ocenjujes za sebe. To sto je student drugde pogresio ne utice \
+na ocenu ovog odgovora.
+3. U 'feedback' pises kratko i konkretno: sta je tacno, sta nedostaje ili je \
+pogresno, i kako glasi tacan odgovor. Obracas se studentu direktno.
+4. U 'misconception' upisujes kratku oznaku greske u razmisljanju ako je vidis \
+(npr. "mesa uslovnu i bezuslovnu verovatnocu"), inace prazan string.
+
+Odgovaras iskljucivo JSON-om, bez ijedne reci van JSON-a.\
+"""
+
 
 def question_type_reference(allowed: Optional[list[str]] = None) -> str:
     lines = []
@@ -194,6 +214,80 @@ Vrati iskljucivo ovaj JSON:
 }}
 - score je izmedju 0 i 1; delimicno tacan odgovor nosi delimican skor.
 - is_correct je true samo ako je score >= 0.8."""
+
+
+def build_review_prompt(
+    *,
+    category_path: str,
+    pending: list[dict],
+    graded: list[dict],
+    material: str,
+    language: str = "sr",
+) -> str:
+    """Jedan poziv za celu sesiju umesto po jedan za svaki tekstualni odgovor.
+
+    `pending` su odgovori koje model ocenjuje: {n, type, stem, payload,
+    answer_text, photo}. `photo` je redni broj prilozene slike ili 0.
+    `graded` su vec ocenjeni odgovori - ulaze samo u zakljucak.
+    """
+    blocks = [f"JEZIK ODGOVORA: {_language_name(language)}", f"CELINA: {category_path}"]
+
+    if pending:
+        items = []
+        for item in pending:
+            photo = (
+                f"\nSLIKA RESENJA: prilozena slika br. {item['photo']} - procitaj postupak, "
+                "proveri korake i rezultat; ako je postupak tacan a racun pogresan, razdvoji to."
+                if item.get("photo")
+                else ""
+            )
+            items.append(
+                f"=== #{item['n']} ({item['type']}) ===\n"
+                f"PITANJE:\n{item['stem']}\n"
+                f"OCEKIVANO:\n{json.dumps(item['payload'], ensure_ascii=False)}\n"
+                f"ODGOVOR STUDENTA:\n{item['answer_text'] or '(prazno)'}{photo}"
+            )
+        blocks.append("ODGOVORI KOJE OCENJUJES:\n\n" + "\n\n".join(items))
+    else:
+        blocks.append("ODGOVORI KOJE OCENJUJES: nema ih - sve je ocenjeno, napisi samo zakljucak.")
+
+    if graded:
+        lines = []
+        for item in graded[:80]:
+            verdict = "tacno" if item["is_correct"] else "netacno"
+            line = f"- [{verdict}] {item['stem'][:140]} | odgovor: {item['answer_text'][:120] or '(prazno)'}"
+            if not item["is_correct"] and item.get("correct_text"):
+                line += f" | tacno je: {item['correct_text'][:120]}"
+            lines.append(line)
+        blocks.append(
+            "OSTALI ODGOVORI IZ SESIJE (vec ocenjeni, NE ocenjujes ih - sluze samo za zakljucak):\n"
+            + "\n".join(lines)
+        )
+
+    if material.strip():
+        blocks.append(
+            "GRADIVO (izvod iz skripte iz kog su pitanja pravljena - merilo za ocenu):\n"
+            + "-" * 60 + "\n" + material + "\n" + "-" * 60
+        )
+    else:
+        blocks.append("GRADIVO: nije dostupno - oceni u odnosu na OCEKIVANO uz svako pitanje.")
+
+    blocks.append("""\
+Vrati iskljucivo ovaj JSON:
+{
+  "results": [
+    {"n": 1, "score": 0.5, "is_correct": false, "feedback": "kratko objasnjenje studentu", "misconception": ""}
+  ],
+  "conclusion": "2-5 recenica: kako je student prosao, sta zna, gde i zasto gresi",
+  "strengths": ["sta mu ide"],
+  "gaps": ["sta mu nedostaje, konkretno"],
+  "next_steps": ["sta da ponovi ili uradi sledece"]
+}
+- 'results' ima TACNO jedan unos za svaki #n iz liste, sa istim brojem 'n'.
+- score je izmedju 0 i 1; delimicno tacan odgovor nosi delimican skor.
+- is_correct je true samo ako je score >= 0.8.""")
+
+    return "\n\n".join(blocks)
 
 
 def build_explanation_prompt(

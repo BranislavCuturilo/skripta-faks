@@ -317,6 +317,14 @@ export function runSession(root, sessionId, onFinished) {
       return;
     }
 
+    // Tekstualni odgovor koji nije pogodjen doslovno ceka AI pregled na kraju
+    // sesije - nema ocene da se prikaze, pa se odmah ide dalje.
+    if (result.pending) {
+      toast('📝 Sačuvano — AI ocenjuje na kraju sesije, sve odjednom.');
+      next();
+      return;
+    }
+
     renderer.reveal(result);
     stage.querySelector('.tools')?.remove();
 
@@ -361,33 +369,26 @@ export function runSession(root, sessionId, onFinished) {
     continueButton.focus();
   }
 
+  // AI pregled se sam pokrece jednom po prikazu rezimea. Ako i posle njega
+  // nesto ceka (poziv pao, model preskocio odgovor), dalje ide samo na klik -
+  // inace bi svaki neuspeh odmah okinuo sledeci placeni poziv.
+  let reviewTried = false;
+
   function showSummary(summary) {
-    const rate = summary.asked ? summary.correct / summary.asked : 0;
-    mount(root, el('div', { class: 'study' }, [
+    const graded = summary.asked - summary.pending;
+    const rate = graded ? summary.correct / graded : 0;
+    const reviewBox = el('div');
+    mount(root, el('div', { class: 'study study--wide' }, [
       el('div', { class: 'grid mb2' }, [
         statTile(summary.asked, 'odgovoreno'),
         statTile(summary.correct, 'tačno', 'mastered'),
-        statTile(summary.asked - summary.correct, 'netačno', 'weak'),
+        statTile(graded - summary.correct, 'netačno', 'weak'),
+        summary.pending ? statTile(summary.pending, 'čeka AI ocenu', 'due') : null,
         statTile(percent(rate), 'uspešnost'),
       ]),
 
-      summary.wrong.length
-        ? el('div', { class: 'card' }, [
-            el('div', { class: 'card__head' }, ['Ovo si pogrešio', el('small', { text: 'vratiće se uskoro' })]),
-            el('div', { class: 'list' }, summary.wrong.map((item) =>
-              el('div', { class: 'list__row' }, [
-                el('div', { class: 'list__main' }, [
-                  el('div', { class: 'list__title', text: item.stem }),
-                  el('div', { class: 'list__meta', text: `${typeLabel(item.type)}${item.topic ? ' · ' + item.topic : ''}` }),
-                ]),
-              ]))),
-          ])
-        : el('div', { class: 'card' }, [
-            el('div', { class: 'card__body center' }, [
-              el('div', { style: { fontSize: '34px' }, text: '🎯' }),
-              el('div', { class: 'mt1', text: 'Sve tačno u ovoj sesiji.' }),
-            ]),
-          ]),
+      reviewBox,
+      answersTable(summary.answers),
 
       summary.by_topic.length > 1
         ? el('div', { class: 'card' }, [
@@ -409,10 +410,151 @@ export function runSession(root, sessionId, onFinished) {
         el('button', { class: 'btn', text: 'Nazad na predmet', onClick: () => onFinished(false) }),
       ]),
     ]));
+    drawReview(reviewBox, summary, '');
     reloadTree();
   }
 
+  function drawReview(box, summary, error) {
+    const ask = () => requestReview(box, summary);
+    if (summary.pending && !reviewTried) { ask(); return; }
+
+    mount(box,
+      summary.review ? conclusionCard(summary.review) : null,
+      summary.pending
+        ? el('div', { class: 'feedback feedback--partial mb2' }, [
+            el('div', { class: 'feedback__verdict', text: `⏳ Čeka AI ocenu: ${summary.pending}` }),
+            el('div', { class: 'small', text: error || 'Odgovori su sačuvani. Ocena ide jednim pozivom za sve.' }),
+            el('div', { class: 'btn-row mt1' }, [
+              el('button', { class: 'btn btn--primary', text: 'Oceni sada', onClick: ask }),
+            ]),
+          ])
+        : null,
+      !summary.pending && !summary.review && summary.asked
+        ? el('div', { class: 'btn-row mb2' }, [
+            el('button', { class: 'btn', text: '🤖 AI zaključak sesije',
+                           title: 'Jedan AI poziv: analiza svih odgovora iz ove sesije', onClick: ask }),
+          ])
+        : null,
+    );
+  }
+
+  async function requestReview(box, summary) {
+    reviewTried = true;
+    mount(box, el('div', { class: 'card' }, [
+      el('div', { class: 'card__body flex' }, [
+        el('div', { class: 'spinner' }),
+        summary.pending
+          ? `AI pregleda odgovore (${summary.pending}) jednim pozivom i piše zaključak...`
+          : 'AI piše zaključak sesije...',
+      ]),
+    ]));
+    try {
+      const { summary: fresh } = await api.post(`/api/study/${sessionId}/review`);
+      showSummary(fresh);
+    } catch (error) {
+      drawReview(box, summary, error.message);
+    }
+  }
+
   next();
+}
+
+// ---------------------------------------------------------------- rezime
+
+function conclusionCard(review) {
+  const section = (label, items) => (items && items.length
+    ? el('div', { class: 'mt1' }, [
+        el('div', { class: 'field__label', text: label }),
+        el('ul', {}, items.map((text) => el('li', { text }))),
+      ])
+    : null);
+
+  return el('div', { class: 'card' }, [
+    el('div', { class: 'card__head' }, [
+      '🤖 AI zaključak sesije',
+      review.model ? el('small', { text: review.model }) : null,
+    ]),
+    el('div', { class: 'card__body prose' }, [
+      review.conclusion ? el('div', { html: markdown(review.conclusion) }) : null,
+      section('✅ Ide ti', review.strengths),
+      section('🕳 Rupe', review.gaps),
+      section('➡️ Sledeće', review.next_steps),
+    ]),
+  ]);
+}
+
+function answerKind(item) {
+  if (item.graded_by === 'pending') return 'pending';
+  if (item.is_correct) return 'good';
+  return item.score > 0 ? 'partial' : 'bad';
+}
+
+function verdictBadge(item) {
+  const kind = answerKind(item);
+  const badge = {
+    pending: ['badge--warn', '⏳ čeka AI'],
+    good: ['badge--good', '✅ tačno'],
+    partial: ['badge--warn', `➗ ${percent(item.score)}`],
+    bad: ['badge--bad', '❌ netačno'],
+  }[kind];
+  return el('span', { class: `badge ${badge[0]}`, text: badge[1] });
+}
+
+function answersTable(answers) {
+  if (!answers.length) {
+    return el('div', { class: 'card' }, [
+      el('div', { class: 'empty' }, [
+        el('div', { class: 'empty__title', text: 'Nema odgovora u ovoj sesiji' }),
+        'Sva pitanja su preskočena ili je sesija prekinuta pre prvog odgovora.',
+      ]),
+    ]);
+  }
+
+  const headers = ['#', 'Pitanje', 'Tvoj odgovor', 'Tačan odgovor', 'Ocena', 'Objašnjenje i napomene'];
+  return el('div', { class: 'card' }, [
+    el('div', { class: 'card__head' }, ['Svi odgovori', el('small', { text: 'pogrešni se vraćaju uskoro' })]),
+    el('div', { class: 'scroll-x' }, [
+      el('table', { class: 'review-table' }, [
+        el('thead', {}, [el('tr', {}, headers.map((text) => el('th', { text })))]),
+        el('tbody', {}, answers.map((item, index) => answerRow(item, index, headers))),
+      ]),
+    ]),
+  ]);
+}
+
+function answerRow(item, index, headers) {
+  const kind = answerKind(item);
+  // Objasnjenje uz tacan lokalni odgovor je samo objasnjenje iz generisanja -
+  // u tabeli bi bilo zid teksta koji niko ne cita.
+  const showFeedback = item.feedback && (kind !== 'good' || item.graded_by !== 'local');
+  const cell = (column, children, extra = {}) => el('td', { dataset: { label: headers[column] }, ...extra }, children);
+
+  return el('tr', { class: `review-table__row review-table__row--${kind}` }, [
+    cell(0, [String(index + 1)], { class: 'review-table__num' }),
+    cell(1, [
+      el('div', { class: 'review-table__stem', text: String(item.stem).replace(/\{\{\s*\d+\s*\}\}/g, '____') }),
+      el('div', { class: 'list__meta', text: `${typeLabel(item.type)}${item.topic ? ' · ' + item.topic : ''}` }),
+    ]),
+    cell(2, [item.answer_text || el('span', { class: 'faint', text: '(prazno)' })]),
+    cell(3, [item.correct_text || '—'], kind === 'good' ? { class: 'faint' } : {}),
+    cell(4, [
+      verdictBadge(item),
+      item.graded_by === 'ai' ? el('div', { class: 'tiny faint mt1', text: 'ocenio AI' }) : null,
+      item.graded_by === 'cache' ? el('div', { class: 'tiny faint mt1', text: 'iz keša' }) : null,
+    ]),
+    cell(5, [
+      showFeedback ? el('div', { class: 'prose', html: markdown(item.feedback) }) : null,
+      item.misconception
+        ? el('div', { class: 'tiny mt1' }, [
+            el('span', { class: 'badge badge--warn', text: 'obrazac greške' }), ' ', item.misconception,
+          ])
+        : null,
+      item.note
+        ? el('div', { class: 'tiny mt1' }, [el('span', { class: 'badge', text: '📝 beleška' }), ' ', item.note])
+        : null,
+      kind === 'pending' ? el('span', { class: 'faint', text: 'stiže posle AI pregleda' }) : null,
+    ]),
+  ]);
 }
 
 function readable(question, renderer) {

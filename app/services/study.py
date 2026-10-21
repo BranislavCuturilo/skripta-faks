@@ -2,16 +2,23 @@
 
 Objasnjenje se placa AI pozivom samo kad mora. Kod ponudjenih odgovora vec
 postoji napisano objasnjenje iz generisanja. Kod dopune recenice, kratkog i
-duzeg odgovora ga nema unapred - tada se zove model, i odgovor se upisuje u
+duzeg odgovora ga nema unapred - tada ocenjuje model, i ocena se upisuje u
 `explanation_cache`, pa isti pogresan odgovor drugi put ne kosta nista.
+
+U sesiji se model NE zove posle svakog takvog odgovora. Odgovor se sacuva kao
+`graded_by = 'pending'`, korisnik ide dalje, a `review` na kraju ocenjuje sve
+koji cekaju jednim pozivom i uz to pise zakljucak o celoj sesiji. Poziv po
+odgovoru je kostao kvotu i pucao usred ucenja; jedan poziv na kraju moze da
+padne samo jednom, i tada odgovori i dalje cekaju - nista se ne gubi.
 """
 
 import hashlib
 import json
+import threading
 from typing import Any, Optional
 
 from .. import config, db, translit
-from ..ai import gemini, prompts
+from ..ai import contract, gemini, prompts
 from ..http_util import HttpError
 from ..quiz import grading, scheduler
 from ..quiz import types as question_types
@@ -20,6 +27,17 @@ from . import ai_models, categories, questions, settings_store, strategy
 GRADE_TIMEOUT_S = 30.0
 GRADE_TIMEOUT_PHOTO_S = 90.0
 GRADE_MAX_ATTEMPTS = 2
+
+# Pregled sesije nosi sve odgovore i izvod iz skripte, pa sme duze od ocene
+# jednog odgovora - ali student i dalje ceka na rezimeu, ne u pozadini.
+REVIEW_TIMEOUT_S = 120.0
+REVIEW_TIMEOUT_PHOTO_S = 180.0
+REVIEW_MAX_ATTEMPTS = 2
+
+# Sesije koje model upravo pregleda. Dupli klik ili dva taba ne smeju da oba
+# ocene iste odgovore - raspored bi tada upisao isti odgovor dvaput.
+_reviewing: set[int] = set()
+_review_lock = threading.Lock()
 
 
 def start(category_id: int, options: Optional[dict] = None) -> dict:
@@ -98,7 +116,7 @@ def next_question(session_id: int) -> dict:
 
 
 def answer(session_id: Optional[int], question_id: int, payload: dict) -> dict:
-    """Oceni odgovor. Lokalno kad god moze, AI samo kad mora."""
+    """Oceni odgovor. Lokalno kad god moze; AI u sesiji tek na kraju, van nje odmah."""
     question = questions.get(question_id)
     session = _session(session_id) if session_id else None
     aggressiveness = session["aggressiveness"] if session else settings_store.get("aggressiveness", 3)
@@ -128,6 +146,10 @@ def answer(session_id: Optional[int], question_id: int, payload: dict) -> dict:
             feedback = cached["feedback"]
             misconception = cached["misconception"]
             graded_by = "cache"
+        elif session:
+            # Ne zove se model sada: odgovor ceka da ga `review` oceni zajedno
+            # sa ostalima iz sesije, jednim pozivom.
+            graded_by = grading.PENDING
         else:
             verdict = _ask_ai(question, answer_text, given)
             if verdict is not None:
@@ -136,23 +158,15 @@ def answer(session_id: Optional[int], question_id: int, payload: dict) -> dict:
                 feedback = verdict["feedback"]
                 misconception = verdict["misconception"]
                 graded_by = "ai"
-                db.execute(
-                    """
-                    INSERT INTO explanation_cache
-                        (question_id, answer_hash, is_correct, score, feedback, misconception)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(question_id, answer_hash) DO NOTHING
-                    """,
-                    (question_id, answer_hash, 1 if verdict["is_correct"] else 0,
-                     verdict["score"], verdict["feedback"], verdict["misconception"]),
-                )
+                _remember(question_id, answer_hash, verdict)
             else:
                 feedback = (
                     "Odgovor nije mogao da se proveri automatski (nema AI kljuca ili poziv nije "
                     "uspeo). Uporedi sam sa tacnim odgovorom ispod."
                 )
 
-    if not feedback:
+    pending = graded_by == grading.PENDING
+    if not feedback and not pending:
         feedback = question["explanation"]
 
     attempt_id = db.insert(
@@ -171,7 +185,9 @@ def answer(session_id: Optional[int], question_id: int, payload: dict) -> dict:
         },
     )
 
-    progress = scheduler.record(question_id, result.score, aggressiveness)
+    # Odgovor koji ceka jos nema ocenu - raspored se upisuje tek kad je dobije,
+    # inace bi svaki tekstualni odgovor prvo bio kaznjen kao netacan.
+    progress = {} if pending else scheduler.record(question_id, result.score, aggressiveness)
     if misconception:
         strategy.record_misconception(
             question["category_id"], misconception, topic=question["topic"]
@@ -190,6 +206,7 @@ def answer(session_id: Optional[int], question_id: int, payload: dict) -> dict:
 
     return {
         "attempt_id": attempt_id,
+        "pending": pending,
         "is_correct": result.is_correct,
         "score": round(result.score, 3),
         "graded_by": graded_by,
@@ -229,21 +246,17 @@ def end(session_id: int) -> dict:
 
 
 def summary(session_id: int) -> dict:
+    """Rezime sesije: tabela svih odgovora, ono sto ceka ocenu, i AI zakljucak."""
     session = _session(session_id)
-    rows = db.query(
-        """
-        SELECT a.*, q.stem, q.type, q.topic
-          FROM attempt a JOIN question q ON q.id = a.question_id
-         WHERE a.session_id = ? ORDER BY a.created_at
-        """,
-        (session_id,),
-    )
-    wrong = [row for row in rows if not row["is_correct"]]
+    rows = _session_attempts(session_id)
+    graded = [row for row in rows if row["graded_by"] != grading.PENDING]
+    wrong = [row for row in graded if not row["is_correct"]]
     return {
         "session": session,
         "asked": len(rows),
-        "correct": sum(1 for row in rows if row["is_correct"]),
-        "average_score": round(sum(row["score"] for row in rows) / len(rows), 3) if rows else 0,
+        "correct": sum(1 for row in graded if row["is_correct"]),
+        "pending": len(rows) - len(graded),
+        "average_score": round(sum(row["score"] for row in graded) / len(graded), 3) if graded else 0,
         "wrong": [
             {
                 "question_id": row["question_id"],
@@ -254,9 +267,135 @@ def summary(session_id: int) -> dict:
             }
             for row in wrong
         ],
-        "by_type": _group(rows, "type"),
-        "by_topic": _group(rows, "topic"),
+        "answers": [
+            {
+                "question_id": row["question_id"],
+                "stem": row["stem"],
+                "type": row["type"],
+                "topic": row["topic"],
+                "answer_text": row["answer_text"],
+                "correct_text": row["correct_text"],
+                "is_correct": bool(row["is_correct"]),
+                "score": round(row["score"], 3),
+                "graded_by": row["graded_by"],
+                "feedback": row["feedback"],
+                "misconception": row["misconception"],
+                "note": row["note"],
+            }
+            for row in rows
+        ],
+        "review": db.json_field(session, "review", None) or None,
+        "by_type": _group(graded, "type"),
+        "by_topic": _group(graded, "topic"),
     }
+
+
+def review(session_id: int) -> dict:
+    """AI pregled sesije: svi odgovori koji cekaju, jednim pozivom, plus zakljucak.
+
+    Ponovni poziv je bezbedan: ocenjuje samo ono sto i dalje ceka, a kad nista
+    ne ceka i zakljucak vec postoji, vraca rezime bez ijednog poziva.
+    """
+    _session(session_id)
+    with _review_lock:
+        if session_id in _reviewing:
+            raise HttpError(409, "AI već pregleda ovu sesiju — sačekaj da završi.")
+        _reviewing.add(session_id)
+    try:
+        _review(session_id)
+    finally:
+        with _review_lock:
+            _reviewing.discard(session_id)
+    return summary(session_id)
+
+
+def _review(session_id: int) -> None:
+    session = _session(session_id)
+    rows = _session_attempts(session_id)
+    if not rows:
+        raise HttpError(400, "U ovoj sesiji još nema odgovora za pregled.")
+    pending = [row for row in rows if row["graded_by"] == grading.PENDING]
+    if not pending and session["review"]:
+        return
+
+    api_key = settings_store.get("gemini_api_key", "")
+    if not api_key:
+        raise HttpError(
+            400,
+            "Nije unet AI ključ (Podešavanja → AI). Odgovori su sačuvani i čekaju ocenu.",
+        )
+
+    items = []
+    files = []
+    for number, row in enumerate(pending, start=1):
+        photo = 0
+        photo_path = row["answer"].get("photo_path")
+        if photo_path and (config.DATA_DIR / photo_path).is_file():
+            files.append({"path": str(config.DATA_DIR / photo_path), "mime_type": ""})
+            photo = len(files)
+        items.append({
+            "n": number,
+            "row": row,
+            "type": row["type"],
+            "stem": row["stem"],
+            "payload": row["payload"],
+            "answer_text": row["answer_text"],
+            "photo": photo,
+        })
+
+    prompt = prompts.build_review_prompt(
+        category_path=" / ".join(
+            node["name"] for node in categories.breadcrumb(session["category_id"])
+        ),
+        pending=items,
+        graded=[row for row in rows if row["graded_by"] != grading.PENDING],
+        material=_review_material([row["question_id"] for row in pending]),
+        language=settings_store.get("ui_language", "sr"),
+    )
+    try:
+        result = ai_models.generate(
+            "strong" if files else "standard",
+            prompt,
+            api_key=api_key,
+            system=prompts.SYSTEM_REVIEW,
+            files=files or None,
+            json_output=True,
+            temperature=0.2,
+            purpose="review",
+            # Isto pravilo kao `_ask_ai`: tekst sa malo razmisljanja, postupak
+            # sa slike normalno. Izlaz ostaje na podrazumevanom velikom
+            # budzetu - ocena dvadeset odgovora ne sme da bude odsecena.
+            thinking="" if files else "low",
+            timeout_s=REVIEW_TIMEOUT_PHOTO_S if files else REVIEW_TIMEOUT_S,
+            max_attempts=REVIEW_MAX_ATTEMPTS,
+        )
+    except gemini.AiError as exc:
+        raise HttpError(502, f"{exc.message} Odgovori su sačuvani i čekaju — pokušaj ponovo.") from None
+
+    data = _parse_review(result["text"])
+    verdicts: dict[int, dict] = {}
+    for raw in data.get("results") or []:
+        if not isinstance(raw, dict):
+            continue
+        try:
+            verdicts[int(raw.get("n"))] = raw
+        except (TypeError, ValueError):
+            continue
+
+    # Svaki odgovor u svojoj transakciji: ocena, kes, raspored i brojac idu
+    # zajedno. Odgovor koji model preskoci ostaje da ceka sledeci pregled.
+    for item in items:
+        raw = verdicts.get(item["n"])
+        if raw is not None:
+            with db.transaction():
+                _apply_review(session, item["row"], _verdict(raw))
+
+    conclusion = _conclusion(data, result.get("model", ""))
+    if conclusion:
+        db.execute(
+            "UPDATE study_session SET review = ? WHERE id = ?",
+            (json.dumps(conclusion, ensure_ascii=False), session_id),
+        )
 
 
 def store_answer_photo(upload, question_id: int) -> str:
@@ -324,15 +463,17 @@ def _ask_ai(question: dict, answer_text: str, given: dict) -> Optional[dict]:
         # odgovor i kaze da automatska provera nije uspela.
         return None
 
-    from ..ai import contract
-
     try:
         payload = json.loads(contract.strip_fence(result["text"]))
     except ValueError:
         return None
     if not isinstance(payload, dict):
         return None
+    return _verdict(payload)
 
+
+def _verdict(payload: dict) -> dict:
+    """Ocena modela -> oblik koji se upisuje. Isto za jedan odgovor i za pregled sesije."""
     try:
         score = max(0.0, min(1.0, float(payload.get("score", 0))))
     except (TypeError, ValueError):
@@ -345,6 +486,156 @@ def _ask_ai(question: dict, answer_text: str, given: dict) -> Optional[dict]:
         "feedback": translit.enforce(str(payload.get("feedback") or "").strip(), script),
         "misconception": translit.enforce(str(payload.get("misconception") or "").strip()[:160], script),
     }
+
+
+def _remember(question_id: int, answer_hash: str, verdict: dict) -> None:
+    db.execute(
+        """
+        INSERT INTO explanation_cache
+            (question_id, answer_hash, is_correct, score, feedback, misconception)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(question_id, answer_hash) DO NOTHING
+        """,
+        (question_id, answer_hash, 1 if verdict["is_correct"] else 0,
+         verdict["score"], verdict["feedback"], verdict["misconception"]),
+    )
+
+
+def _apply_review(session: dict, row: dict, verdict: dict) -> None:
+    """Upisi ocenu odgovora koji je cekao - sve sto `answer` tada nije uradio."""
+    db.execute(
+        """
+        UPDATE attempt
+           SET is_correct = ?, score = ?, graded_by = 'ai', feedback = ?, misconception = ?
+         WHERE id = ? AND graded_by = ?
+        """,
+        (1 if verdict["is_correct"] else 0, verdict["score"],
+         verdict["feedback"] or row["explanation"], verdict["misconception"],
+         row["id"], grading.PENDING),
+    )
+    _remember(row["question_id"], row["answer_hash"], verdict)
+    scheduler.record(row["question_id"], verdict["score"], session["aggressiveness"])
+    if verdict["misconception"]:
+        strategy.record_misconception(
+            row["category_id"], verdict["misconception"], topic=row["topic"]
+        )
+    if verdict["is_correct"]:
+        db.execute(
+            "UPDATE study_session SET correct_count = correct_count + 1 WHERE id = ?",
+            (session["id"],),
+        )
+
+
+def _parse_review(text: str) -> dict:
+    unreadable = HttpError(
+        502,
+        "AI je vratio odgovor koji ne može da se pročita. Odgovori su sačuvani i čekaju — "
+        "pokušaj ponovo.",
+    )
+    cleaned = contract.strip_fence(text)
+    try:
+        data = json.loads(cleaned)
+    except ValueError:
+        # Odsecen odgovor: cele ocene se spasavaju, zakljucak je izgubljen.
+        try:
+            return {"results": contract.salvage_objects(cleaned)}
+        except contract.ContractError:
+            raise unreadable from None
+    if not isinstance(data, dict):
+        raise unreadable
+    return data
+
+
+def _conclusion(data: dict, model: str) -> dict:
+    """Zakljucak sesije iz odgovora modela; prazan dict kad ga model nije dao."""
+    script = translit.script_for_language(settings_store.get("ui_language", "sr"))
+
+    def lines(key: str) -> list[str]:
+        raw = data.get(key)
+        if not isinstance(raw, list):
+            return []
+        return [translit.enforce(str(item).strip(), script) for item in raw if str(item).strip()][:8]
+
+    content = {
+        "conclusion": translit.enforce(str(data.get("conclusion") or "").strip(), script),
+        "strengths": lines("strengths"),
+        "gaps": lines("gaps"),
+        "next_steps": lines("next_steps"),
+    }
+    if not any(content.values()):
+        return {}
+    return {**content, "model": model, "created_at": db.scalar("SELECT datetime('now')")}
+
+
+def _review_material(question_ids: list[int]) -> str:
+    """Izvod iz skripte iz kog su ova pitanja pravljena - merilo za ocenu.
+
+    Isti komadi koji su otisli modelu pri generisanju, pa ovo ne salje napolje
+    nista sto vec nije poslato. Pitanje bez generisanja (ispitna baza) nema
+    izvod i ocenjuje se po ocekivanom odgovoru.
+    """
+    if not question_ids:
+        return ""
+    marks = ", ".join("?" for _ in question_ids)
+    runs = db.query(
+        f"""
+        SELECT DISTINCT r.chunk_ids
+          FROM question q JOIN generation_run r ON r.id = q.generation_run_id
+         WHERE q.id IN ({marks})
+        """,
+        question_ids,
+    )
+    chunk_ids = sorted({int(item) for run in runs for item in db.json_field(run, "chunk_ids", [])})
+    if not chunk_ids:
+        return ""
+
+    rows = db.query(
+        f"""
+        SELECT c.label, c.text, m.filename
+          FROM material_chunk c JOIN material m ON m.id = c.material_id
+         WHERE c.id IN ({", ".join("?" for _ in chunk_ids)})
+         ORDER BY c.material_id, c.ordinal
+        """,
+        chunk_ids,
+    )
+    budget = int(settings_store.get("batch_char_budget", 60000) or 60000)
+    pieces: list[str] = []
+    used = 0
+    for row in rows:
+        source = row["filename"] + (f" - {row['label']}" if row["label"] else "")
+        block = f"[{source}]\n{row['text']}"
+        if used + len(block) > budget:
+            break
+        pieces.append(block)
+        used += len(block)
+    return "\n\n".join(pieces)
+
+
+def _session_attempts(session_id: int) -> list[dict]:
+    """Svi odgovori sesije redom, sa pitanjem, tekstom odgovora i tacnim odgovorom."""
+    rows = db.query(
+        """
+        SELECT a.*, q.stem, q.type, q.topic, q.explanation, q.category_id,
+               q.payload AS question_payload, COALESCE(m.note, '') AS note
+          FROM attempt a
+          JOIN question q ON q.id = a.question_id
+          LEFT JOIN question_meta m ON m.question_id = q.id
+         WHERE a.session_id = ?
+         ORDER BY a.created_at, a.id
+        """,
+        (session_id,),
+    )
+    for row in rows:
+        row["payload"] = db.json_field(row, "question_payload")
+        row["answer"] = db.json_field(row, "answer")
+        row["correct_text"] = grading.correct_answer_text(row["type"], row["payload"])
+        try:
+            row["answer_text"] = grading.describe_answer(row["type"], row["payload"], row["answer"])
+        except (KeyError, IndexError, TypeError, ValueError):
+            # Pitanje je posle odgovora prepravljeno (manje ponudjenih...) -
+            # odgovor se vise ne da procitati, ali red u tabeli ostaje.
+            row["answer_text"] = ""
+    return rows
 
 
 def _session(session_id: int) -> dict:

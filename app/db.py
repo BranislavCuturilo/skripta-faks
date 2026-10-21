@@ -301,6 +301,15 @@ migration(
     """
 )
 
+migration(
+    """
+    -- Zakljucak AI pregleda na kraju sesije (JSON). Tekstualni odgovori u
+    -- sesiji ne zovu AI jedan po jedan: cekaju kao attempt.graded_by =
+    -- 'pending' i svi se ocenjuju jednim pozivom, zajedno sa ovim zakljuckom.
+    ALTER TABLE study_session ADD COLUMN review TEXT NOT NULL DEFAULT '';
+    """
+)
+
 
 def connect() -> sqlite3.Connection:
     conn = getattr(_local, "conn", None)

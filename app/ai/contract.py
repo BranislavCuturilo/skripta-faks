@@ -176,6 +176,11 @@ def _normalize_text(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value).strip()
 
 
+def salvage_objects(text: str) -> list:
+    """Svi celi objekti iz prvog JSON niza u odsecenom odgovoru."""
+    return _salvage(text)[0]["questions"]
+
+
 def _salvage(text: str) -> tuple[dict, bool]:
     """Odsecen odgovor (MAX_TOKENS) - spasi sve cele objekte iz niza.
 

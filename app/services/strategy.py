@@ -14,6 +14,7 @@ from typing import Any, Optional
 from .. import db
 from ..ai import contract, gemini, prompts
 from ..http_util import HttpError
+from ..quiz import grading
 from . import ai_models, categories, settings_store
 
 KIND_GENERATION = "generation"
@@ -155,10 +156,10 @@ def evidence(category_id: int, attempt_limit: int = 400) -> dict:
                COUNT(*) AS attempts,
                ROUND(AVG(a.score), 3) AS average_score
           FROM attempt a JOIN question q ON q.id = a.question_id
-         WHERE q.category_id IN ({marks})
+         WHERE q.category_id IN ({marks}) AND a.graded_by <> ?
          GROUP BY q.type ORDER BY attempts DESC
         """,
-        ids,
+        [*ids, grading.PENDING],
     )
     by_topic = db.query(
         f"""
@@ -166,20 +167,20 @@ def evidence(category_id: int, attempt_limit: int = 400) -> dict:
                COUNT(*) AS attempts,
                ROUND(AVG(a.score), 3) AS average_score
           FROM attempt a JOIN question q ON q.id = a.question_id
-         WHERE q.category_id IN ({marks})
+         WHERE q.category_id IN ({marks}) AND a.graded_by <> ?
          GROUP BY topic HAVING attempts >= 2
          ORDER BY average_score ASC LIMIT 25
         """,
-        ids,
+        [*ids, grading.PENDING],
     )
     by_difficulty = db.query(
         f"""
         SELECT q.difficulty, COUNT(*) AS attempts, ROUND(AVG(a.score), 3) AS average_score
           FROM attempt a JOIN question q ON q.id = a.question_id
-         WHERE q.category_id IN ({marks})
+         WHERE q.category_id IN ({marks}) AND a.graded_by <> ?
          GROUP BY q.difficulty ORDER BY q.difficulty
         """,
-        ids,
+        [*ids, grading.PENDING],
     )
     repeated = db.query(
         f"""
@@ -203,9 +204,9 @@ def evidence(category_id: int, attempt_limit: int = 400) -> dict:
         f"""
         SELECT COUNT(*) AS attempts, ROUND(AVG(a.score), 3) AS average_score
           FROM attempt a JOIN question q ON q.id = a.question_id
-         WHERE q.category_id IN ({marks})
+         WHERE q.category_id IN ({marks}) AND a.graded_by <> ?
         """,
-        ids,
+        [*ids, grading.PENDING],
     ) or {}
 
     return {

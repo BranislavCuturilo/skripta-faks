@@ -94,9 +94,16 @@ Aplikacija je pravljena da to štedi:
 - **jedan poziv nosi do 60.000 znakova gradiva** i traži desetine pitanja odjednom
 - **odgovori se ocenjuju lokalno kad god mogu** — AI ulazi u igru samo za dopunu
   rečenice koja je promašena, za duži odgovor i za foto-zadatke
+- **u sesiji takvi odgovori čekaju kraj** — napišeš odgovor, aplikacija ga sačuva
+  i ide dalje. Na kraju **jedan poziv** oceni sve odjednom, proveri ih prema
+  skripti iz koje su pitanja pravljena, i napiše zaključak: šta ti ide, gde su
+  rupe, šta da ponoviš. Sve to stoji u tabeli svih odgovora na rezimeu sesije.
+  Ako poziv ne uspe (kvota, internet), odgovori ostaju da čekaju — dugme
+  *Oceni sada* pokušava ponovo, ništa se ne gubi.
 - **isti pogrešan odgovor drugi put ne košta ništa** — objašnjenje se pamti
-- **ocena otvorenog odgovora stiže za nekoliko sekundi** — ako Google ne odgovori
-  ni posle pola minuta, aplikacija ne čeka dalje: pokaže tačan odgovor da uporediš sam
+- **provera jednog pitanja iz liste stiže za nekoliko sekundi** — ako Google ne
+  odgovori ni posle pola minuta, aplikacija ne čeka dalje: pokaže tačan odgovor da
+  uporediš sam
 
 U **Podešavanja → Potrošnja AI poziva** vidiš tačno koliko je poziva otišlo i na šta.
 

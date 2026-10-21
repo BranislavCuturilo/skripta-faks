@@ -2,7 +2,7 @@
 
 from .. import db
 from ..http_util import HttpError, Request, Response, json_response
-from ..quiz import scheduler
+from ..quiz import grading, scheduler
 from ..router import router
 from ..services import categories, settings_store, study
 
@@ -62,6 +62,12 @@ def session_summary(request: Request) -> Response:
     return json_response({"ok": True, "summary": study.summary(request.params["session_id"])})
 
 
+@router.post("/api/study/<int:session_id>/review")
+def review_session(request: Request) -> Response:
+    """Jedan AI poziv: oceni sve odgovore koji cekaju i napisi zakljucak sesije."""
+    return json_response({"ok": True, "summary": study.review(request.params["session_id"])})
+
+
 @router.post("/api/study/photo/<int:question_id>")
 def upload_answer_photo(request: Request) -> Response:
     """Slika resenja sa telefona - localhost je dostupan na LAN-u pa ovo radi."""
@@ -112,7 +118,8 @@ def _activity(category_ids: list[int], days: int = 30) -> list[dict]:
           FROM attempt a JOIN question q ON q.id = a.question_id
          WHERE q.category_id IN ({marks})
            AND a.created_at >= datetime('now', ?)
+           AND a.graded_by <> ?
          GROUP BY day ORDER BY day
         """,
-        [*category_ids, f"-{days} days"],
+        [*category_ids, f"-{days} days", grading.PENDING],
     )

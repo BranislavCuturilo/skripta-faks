@@ -144,6 +144,35 @@ zahtev još jednom bez njega. Foto-zadaci razmišljaju normalno i čekaju duže.
 Poslovi u pozadini (generisanje, prepis ispita) i dalje rade sa strpljivim
 podrazumevanim vrednostima.
 
+### U sesiji: jedan AI poziv na kraju, ne po odgovoru
+
+I sa tim ograničenjima, poziv posle svakog tekstualnog odgovora troši kvotu po
+pitanju i drži studenta da čeka usred učenja. Zato `study.answer` u sesiji ne
+zove model. Odgovor se upiše sa
+`attempt.graded_by = 'pending'` (`grading.PENDING`) i korisnik ide dalje.
+`study.review` na kraju šalje **jedan** poziv sa svim odgovorima koji čekaju,
+ostalim odgovorima iz sesije (za zaključak) i izvodom iz skripte iz kog su ta
+pitanja generisana (`generation_run.chunk_ids`) — isti tekst koji je modelu već
+poslat pri generisanju. Model vrati ocenu po odgovoru i zaključak sesije, koji
+se čuva u `study_session.review`.
+
+Pravila koja drže ovo poštenim:
+
+- **Odgovor koji čeka nema ocenu.** Raspored (`scheduler.record`), brojač
+  tačnih, strategija i grafikon aktivnosti ga ne vide dok ga pregled ne oceni —
+  inače bi svaki esej prvo bio kažnjen kao netačan, pa ocenjen još jednom.
+- **Pao poziv ne gubi ništa.** Odgovori ostaju `pending`; ponovni pregled
+  ocenjuje samo ono što i dalje čeka. Odgovor koji model preskoči čeka sledeći.
+- **Svaka ocena je jedna transakcija** — upis ocene, keš, raspored i brojač.
+- **Dva pregleda iste sesije ne idu istovremeno** (409), da raspored ne upiše
+  isti odgovor dvaput.
+- Van sesije (provera jednog pitanja iz liste) model se i dalje zove odmah —
+  tu nema „kraja" na koji bi se čekalo.
+- Pregled ima svoja ograničenja (`REVIEW_*`): isto `thinking="low"` za tekst,
+  ali duži timeout i pun izlazni budžet, jer nosi sve odgovore odjednom.
+
+Pinovano u `tests/test_session_review.py`.
+
 ### Isti ugovor za Gemini i za ručno nalepljen odgovor
 
 `app/ai/contract.py` je jedini put kojim pitanja ulaze u bazu. Kad Gemini ne može
@@ -230,7 +259,7 @@ fajl ne napušta mašinu i van je gita.
 
 ## Testovi
 
-125 testova, `python run_tests.py`. Bez pytest-a — `unittest` je u standardnoj
+271 test, `python run_tests.py`. Bez pytest-a — `unittest` je u standardnoj
 biblioteci.
 
 Dva nezavisna predohrana, oba pinovana testom koji ih namerno ruši:

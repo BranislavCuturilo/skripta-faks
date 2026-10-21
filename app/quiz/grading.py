@@ -15,6 +15,11 @@ from .. import translit
 from . import types as question_types
 
 
+# `attempt.graded_by` odgovora koji ceka AI ocenu na kraju sesije. Takav odgovor
+# jos nema ocenu: ne ulazi u proseke, raspored ni strategiju dok je ne dobije.
+PENDING = "pending"
+
+
 @dataclass
 class Grade:
     is_correct: bool
