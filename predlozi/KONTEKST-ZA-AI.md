@@ -62,7 +62,7 @@ aplikacija uopšte ovako izgleda.
 | `app/__init__.py` | 3 | skripta-faks: lokalna aplikacija za ucenje uz pomoc AI-ja, bez zavisnosti. |
 | `app/ai/__init__.py` | 6 | AI sloj: klijent, promptovi i ugovor o formatu odgovora. |
 | `app/ai/contract.py` | 233 | Ugovor o formatu izmedju aplikacije i bilo kog modela. |
-| `app/ai/gemini.py` | 378 | Gemini klijent na urllib. |
+| `app/ai/gemini.py` | 424 | Gemini klijent na urllib. |
 | `app/ai/models.py` | 176 | Koji se model zove za koji posao. |
 | `app/ai/prompts.py` | 539 | Sablonski promptovi. |
 | `app/ai/tts.py` | 120 | Izgovor teksta. |
@@ -95,7 +95,7 @@ aplikacija uopšte ovako izgleda.
 | `app/router.py` | 107 | Minimalni ruter: sablon putanje -> funkcija. |
 | `app/server.py` | 259 | HTTP server nad standardnom bibliotekom. |
 | `app/services/__init__.py` | 1 | Poslovna logika. Rute u app/api su tanke i samo zovu ovo. |
-| `app/services/ai_models.py` | 248 | Izbor modela u toku rada, sa samopopravljanjem. |
+| `app/services/ai_models.py` | 281 | Izbor modela u toku rada, sa samopopravljanjem. |
 | `app/services/categories.py` | 293 | Kategorije: samo-referentno stablo bez ogranicenja dubine. |
 | `app/services/exam_import.py` | 452 | Uvoz fiksne liste ispitnih pitanja - DOSLOVNO, bez AI prepravljanja. |
 | `app/services/generation.py` | 463 | Generisanje pitanja iz materijala. |

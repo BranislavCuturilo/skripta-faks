@@ -11,9 +11,11 @@ podesavanja. Cilj je da korisnik NIKAD ne mora da menja model rucno:
 - **Spisak se osvezava sam**, jednom dnevno (`STALE_AFTER_HOURS`), na startu i
   pred poziv. Nov model se koristi cim ga Google objavi.
 - **Model koji ne radi sa ovim kljucem se preskace.** Nestao (404) ili bez
-  besplatne kvote ("limit: 0") - pamti se na `UNUSABLE_DAYS` i ide sledeci
-  najnoviji. Obicna potrosena kvota (429) jednog modela prelazi na drugi samo
-  za taj poziv: svaki model ima svoju kvotu.
+  besplatne kvote ("limit: 0") - pamti se na `UNUSABLE_DAYS`. Potrosena
+  DNEVNA kvota (besplatan kljuc: ~20 poziva dnevno po modelu) - pamti se do
+  obnove koju Google navede ("retry in 14h"). U oba slucaja ide sledeci
+  najnoviji, jer svaki model ima svoju kvotu. Kratka kvota (po minutu) menja
+  model samo za taj poziv.
 
 Rucni izbor se postuje, osim kad model nestane ili je iz familije koja se gasi;
 tada se vraca na automatski i to se **prijavi**.
@@ -43,9 +45,10 @@ AUTO = ("", "auto")
 
 STALE_AFTER_HOURS = 24
 UNUSABLE_DAYS = 7
-# Najvise toliko zamena u jednom pozivu - posle toga je problem u kljucu ili
-# mrezi, ne u modelu, i dalje probanje samo trosi kvotu.
-MAX_SWITCHES = 2
+# Najvise toliko zamena u jednom pozivu. Odbijen poziv (429) ne trosi kvotu, a
+# sa 20 dnevno po modelu je sledeci model cesto jedini koji jos ima - ali posle
+# ovoliko je problem u kljucu ili mrezi, ne u modelu.
+MAX_SWITCHES = 3
 # Kad osvezavanje ne uspe (nema mreze), ne pokusava se pred svaki poziv.
 _RETRY_REFRESH_S = 3600.0
 
@@ -77,7 +80,7 @@ def manual_choice(tier: str) -> str:
 
 
 def unusable() -> dict[str, str]:
-    """Modeli za koje se zna da ne rade sa ovim kljucem -> kada je to vidjeno."""
+    """Modeli koji sada ne rade sa ovim kljucem -> do kada (UTC, kao SQLite)."""
     raw = settings_store.get(UNUSABLE_KEY, "")
     try:
         parsed = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
@@ -85,13 +88,15 @@ def unusable() -> dict[str, str]:
         return {}
     if not isinstance(parsed, dict):
         return {}
-    cutoff = db.scalar("SELECT datetime('now', ?)", (f"-{UNUSABLE_DAYS} days",))
-    return {str(name): str(seen) for name, seen in parsed.items() if str(seen) > cutoff}
+    now = _now()
+    return {str(name): str(until) for name, until in parsed.items() if str(until) > now}
 
 
-def mark_unusable(name: str) -> None:
+def mark_unusable(name: str, seconds: Optional[float] = None) -> None:
+    """Preskaci model `seconds` sekundi (podrazumevano `UNUSABLE_DAYS`)."""
+    span = seconds if seconds else UNUSABLE_DAYS * 86400
     marked = unusable()
-    marked[name] = db.scalar("SELECT datetime('now')")
+    marked[name] = db.scalar("SELECT datetime('now', ?)", (f"+{int(span)} seconds",))
     settings_store.set_value(UNUSABLE_KEY, marked)
 
 
@@ -193,29 +198,54 @@ def generate(tier: str, prompt: str, **kwargs) -> dict:
     if automatic and model in unusable():
         model = for_tier(tier)
 
-    first = model
-    switches = 0
+    tried = [model]
     while True:
         try:
             result = gemini.generate(api_key, model, prompt, **kwargs)
         except gemini.AiError as exc:
             replacement = (
                 _replacement(tier, model, exc, automatic, api_key)
-                if switches < MAX_SWITCHES else None
+                if len(tried) <= MAX_SWITCHES else None
             )
             if replacement is None:
-                if _looks_like_missing_model(exc):
-                    raise gemini.AiError(
-                        f"Model '{model}' više nije dostupan za tvoj ključ, a zamena nije nađena. "
-                        "Otvori Podešavanja → Modeli i izaberi ručno.",
-                        status=exc.status,
-                    ) from None
-                raise
+                raise _final_error(exc, tried, automatic) from None
             model = replacement
-            switches += 1
+            tried.append(model)
             continue
-        switched = {"from": first, "to": model} if model != first else None
+        switched = {"from": tried[0], "to": model} if model != tried[0] else None
         return {**result, "model_switched": switched}
+
+
+def _final_error(exc: gemini.AiError, tried: list[str], automatic: bool) -> gemini.AiError:
+    """Greska koja kaze sta je probano i sta korisnik moze - ne samo poslednji 429."""
+    if _looks_like_missing_model(exc):
+        return gemini.AiError(
+            f"Model '{tried[-1]}' više nije dostupan za tvoj ključ, a zamena nije nađena. "
+            "Otvori Podešavanja → Modeli i izaberi ručno.",
+            status=exc.status,
+        )
+    if exc.status != 429:
+        return exc
+    if not automatic:
+        return gemini.AiError(
+            f"{exc.message} Model '{tried[-1]}' si izabrao ručno, pa aplikacija ne prelazi na "
+            "drugi. Vrati ga na Automatski (Podešavanja → Modeli) i preći će sama.",
+            status=429,
+        )
+    if len(tried) == 1:
+        return exc
+    resets = [until for name, until in unusable().items() if name in tried]
+    when = ""
+    if resets:
+        wait = db.scalar("SELECT (julianday(?) - julianday('now')) * 86400", (min(resets),))
+        when = f" Prvi se obnavlja za {gemini.describe_wait(float(wait or 0))}."
+    return gemini.AiError(
+        f"Besplatna kvota je potrošena za sve modele koje je aplikacija probala "
+        f"({', '.join(tried)}).{when} Svaki model ima posebnu dnevnu kvotu — na besplatnom "
+        "ključu oko 20 poziva dnevno po modelu. Na šta su otišli vidiš u Podešavanja → "
+        "Potrošnja AI poziva.",
+        status=429,
+    )
 
 
 def _replacement(
@@ -231,6 +261,9 @@ def _replacement(
         return None
     elif gemini.is_no_free_quota(exc):
         mark_unusable(model)
+    elif gemini.is_exhausted(exc):
+        # Dnevna kvota: do obnove se ne trosi ni jedan pokusaj na ovaj model.
+        mark_unusable(model, seconds=exc.retry_after_s)
     elif exc.status != 429:
         return None
 

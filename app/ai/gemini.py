@@ -37,18 +37,36 @@ DEFAULT_TIMEOUT_S = 300.0
 # 429 sa "limit: 0" nije "sacekaj minut" nego "ovaj model nema besplatnu kvotu
 # za tvoj kljuc" - tipicno nov preview. Ponavljanje ne pomaze, pomaze drugi model.
 _NO_FREE_QUOTA = re.compile(r"\blimit:\s*0\b")
+_LIMIT = re.compile(r"\blimit:\s*(\d+)")
+# Google uz 429 kaze kad sme ponovo: "Please retry in 14h11m8.2s" ili "in 23.5s".
+_RETRY_IN = re.compile(r"retry in\s*(?:(\d+)h)?\s*(?:(\d+)m(?!s))?\s*(?:(\d+(?:\.\d+)?)s)?",
+                       re.IGNORECASE)
+
+# Toliko se najvise ceka u istom pozivu kad Google kaze "probaj za N s". Duze od
+# toga ne vredi drzati studenta da ceka - ima drugih modela, svaki sa svojom kvotom.
+WAIT_IN_CALL_S = 10.0
+# Obnova kvote za duze od ovoga = kvota za danas je potrosena (besplatan kljuc
+# ima ~20 poziva dnevno po modelu, i obnavlja se u ponoc po pacifickom vremenu).
+EXHAUSTED_AFTER_S = 15 * 60.0
 
 
 class AiError(Exception):
-    def __init__(self, message: str, status: Optional[int] = None, retryable: bool = False):
+    def __init__(self, message: str, status: Optional[int] = None, retryable: bool = False,
+                 retry_after_s: Optional[float] = None):
         super().__init__(message)
         self.message = message
         self.status = status
         self.retryable = retryable
+        self.retry_after_s = retry_after_s
 
 
 def is_no_free_quota(exc: AiError) -> bool:
     return exc.status == 429 and bool(_NO_FREE_QUOTA.search(exc.message or ""))
+
+
+def is_exhausted(exc: AiError) -> bool:
+    """Dnevna kvota ovog modela je potrosena - obnavlja se tek za `retry_after_s`."""
+    return exc.status == 429 and (exc.retry_after_s or 0) >= EXHAUSTED_AFTER_S
 
 
 def generate(
@@ -269,7 +287,8 @@ def _request(
             last = exc
             if not exc.retryable or attempt == max_attempts - 1:
                 raise
-            time.sleep(delay)
+            # Kad Google kaze koliko, cekaj toliko - kraci pokusaj bi opet dobio 429.
+            time.sleep(exc.retry_after_s if exc.retry_after_s else delay)
             delay *= 2
     raise last or AiError("Poziv nije uspeo.")
 
@@ -296,14 +315,35 @@ def _open(request: urllib.request.Request, timeout_s: float = DEFAULT_TIMEOUT_S)
 
 def _http_error(status: int, detail: str) -> AiError:
     no_free_quota = status == 429 and bool(_NO_FREE_QUOTA.search(detail))
+    retry_after = _retry_after(detail) if status == 429 else None
+    exhausted = retry_after is not None and retry_after >= EXHAUSTED_AFTER_S
+    # Ceka se u istom pozivu samo kratko; ostalo resava sledeci model.
+    waits_long = retry_after is not None and retry_after > WAIT_IN_CALL_S
     return AiError(
-        _friendly(status, detail, no_free_quota),
+        _friendly(status, detail, no_free_quota, retry_after if exhausted else None),
         status=status,
-        retryable=status in RETRY_STATUSES and not no_free_quota,
+        retryable=status in RETRY_STATUSES and not no_free_quota and not waits_long,
+        retry_after_s=retry_after,
     )
 
 
-def _friendly(status: int, detail: str, no_free_quota: bool = False) -> str:
+def _retry_after(detail: str) -> Optional[float]:
+    found = _RETRY_IN.search(detail or "")
+    if not found or not any(found.groups()):
+        return None
+    hours, minutes, seconds = (float(part) if part else 0.0 for part in found.groups())
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def describe_wait(seconds: float) -> str:
+    """'oko 14 h' / 'oko 25 min' - za poruku korisniku."""
+    if seconds >= 3600:
+        return f"oko {round(seconds / 3600)} h"
+    return f"oko {max(1, round(seconds / 60))} min"
+
+
+def _friendly(status: int, detail: str, no_free_quota: bool = False,
+              exhausted_for: Optional[float] = None) -> str:
     """Poruka iz koje se vidi STA da se uradi, ne samo da nesto ne valja.
 
     401 i 403 su ovde najvazniji: Google gasi stari tip kljuca ("standard") i
@@ -331,6 +371,12 @@ def _friendly(status: int, detail: str, no_free_quota: bool = False) -> str:
     if no_free_quota:
         base = ("Ovaj model nema besplatnu kvotu za tvoj ključ — Google ga naplaćuje "
                 "(najčešće nov preview). Čekanje ne pomaže; aplikacija prelazi na drugi model.")
+    elif exhausted_for is not None:
+        limit = _LIMIT.search(detail or "")
+        per_day = f" ({limit.group(1)} poziva dnevno)" if limit else ""
+        base = (f"Dnevna besplatna kvota za ovaj model je potrošena{per_day}. Obnavlja se za "
+                f"{describe_wait(exhausted_for)}. Svaki model ima svoju kvotu, pa aplikacija "
+                "prelazi na drugi.")
     return f"{base} {detail}".strip() if detail else base
 
 

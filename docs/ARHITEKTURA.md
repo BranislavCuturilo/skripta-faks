@@ -124,10 +124,16 @@ Korisnik ne bira ništa — pinovano u `tests/test_ai_models.py`:
 - **Spisak se osvežava sam**, jednom dnevno: na startu (u pozadini) i pred poziv
   (`refresh_if_stale`). Neuspelo osvežavanje se ne ponavlja pred svaki poziv.
 - **Model koji ne radi sa ključem se preskače u istom pozivu.** Nestao (404) ili
-  bez besplatne kvote (429 sa `limit: 0`, koji se zato ni ne ponavlja) — pamti se
-  7 dana u `models_unusable` i ide sledeći najnoviji. Obična potrošena kvota
-  menja model samo za taj poziv, jer svaki model ima svoju kvotu. Najviše dve
-  zamene po pozivu — posle toga je kriv ključ ili mreža.
+  bez besplatne kvote (429 sa `limit: 0`) — pamti se 7 dana u `models_unusable`.
+  Potrošena **dnevna** kvota (besplatan ključ: ~20 poziva dnevno po modelu;
+  429 sa „retry in 14h…") — pamti se **do obnove** koju Google navede. U oba
+  slučaja ide sledeći najnoviji, jer svaki model ima svoju kvotu. Kratka kvota
+  („retry in 4s") se sačeka u istom pozivu (`WAIT_IN_CALL_S`), duža prepušta
+  drugom modelu. Ništa od toga se ne ponavlja uzalud. Najviše tri zamene po
+  pozivu; kad padnu sve, poruka kaže koji su modeli probani i kada se prvi
+  obnavlja. Prvi slučaj iz prakse: korisnik je ceo test od 50 odgovora ostao
+  bez AI pregleda jer je jedini model koji je app znala imao `limit: 20` i
+  obnovu za 14 h, a poruka je glasila „sačekaj minut-dva".
 - Ručni izbor se poštuje, osim kad model nestane ili je iz familije koja se
   gasi; tada se vraća na automatski i **prijavi**.
 
@@ -316,7 +322,7 @@ fajl ne napušta mašinu i van je gita.
 
 ## Testovi
 
-333 testa, `python run_tests.py`. Bez pytest-a — `unittest` je u standardnoj
+341 test, `python run_tests.py`. Bez pytest-a — `unittest` je u standardnoj
 biblioteci.
 
 Dva nezavisna predohrana, oba pinovana testom koji ih namerno ruši:

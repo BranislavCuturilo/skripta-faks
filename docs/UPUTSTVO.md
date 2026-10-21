@@ -87,8 +87,14 @@ prve i poslednje četiri cifre.
 
 ### Besplatna kvota
 
-Google daje ograničen broj poziva dnevno i po minutu. Ako pređeš, dobićeš poruku
-*„Prešao si besplatnu kvotu za sada"* — sačekaj minut do dva i probaj ponovo.
+Google daje ograničen broj poziva **po minutu i po danu, posebno za svaki
+model**. Na besplatnom ključu je to danas oko **20 poziva dnevno po modelu**;
+obnavlja se u ponoć po pacifičkom vremenu (oko 9 ujutru kod nas).
+
+Kad se dnevna kvota jednog modela potroši, aplikacija **sama pređe na drugi**
+model i pamti do kada je prvi potrošen. Tek kad su potrošeni svi, dobiješ
+poruku koja kaže koji su probani i kada se prvi obnavlja. Kvota po minutu
+(*„probaj za 20 s"*) se samo sačeka ili preskoči na drugi model.
 
 Aplikacija je pravljena da to štedi:
 - **jedan poziv nosi do 60.000 znakova gradiva** i traži desetine pitanja odjednom

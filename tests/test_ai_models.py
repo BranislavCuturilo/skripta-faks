@@ -472,6 +472,48 @@ class SwitchingTests(AppTestCase):
                 ai_models.generate("standard", "pitanje")
         self.assertEqual(self.tried, ["gemini-3.7-flash"])
 
+    def test_exhausted_daily_quota_is_skipped_until_it_resets(self):
+        """Slucaj sa slike: dnevna kvota jednog modela je potrosena. Ostali
+        modeli imaju svoju - i do obnove se ne trosi ni jedan pokusaj na njega."""
+        exhausted = gemini._http_error(429, SCREENSHOT_429)
+        with self._generate({"gemini-3.7-flash": exhausted}):
+            result = ai_models.generate("standard", "pitanje")
+            self.assertEqual(result["model_switched"]["to"], "gemini-3.6-flash")
+
+            until = ai_models.unusable()["gemini-3.7-flash"]
+            self.assertGreater(until, db.scalar("SELECT datetime('now', '+13 hours')"))
+            self.assertLess(until, db.scalar("SELECT datetime('now', '+15 hours')"))
+
+            self.tried.clear()
+            ai_models.generate("standard", "pitanje")
+        self.assertEqual(self.tried, ["gemini-3.6-flash"])
+
+    def test_model_comes_back_when_its_quota_resets(self):
+        settings_store.set_value(ai_models.UNUSABLE_KEY, {
+            "gemini-3.7-flash": db.scalar("SELECT datetime('now', '-1 minute')")})
+        self.assertEqual(ai_models.for_tier("standard"), "gemini-3.7-flash")
+
+    def test_when_every_model_is_exhausted_the_message_says_which_and_when(self):
+        exhausted = gemini._http_error(429, SCREENSHOT_429)
+        with self._generate({name: exhausted for name in LIVE}):
+            with self.assertRaises(gemini.AiError) as caught:
+                ai_models.generate("standard", "pitanje")
+        message = caught.exception.message
+        self.assertEqual(len(self.tried), ai_models.MAX_SWITCHES + 1)
+        for name in self.tried:
+            self.assertIn(name, message)
+        self.assertIn("oko 14 h", message)
+        self.assertIn("Potrošnja AI poziva", message)
+
+    def test_manual_choice_says_how_to_let_it_switch(self):
+        settings_store.set_value("model_standard", "gemini-3.5-flash")
+        exhausted = gemini._http_error(429, SCREENSHOT_429)
+        with self._generate({"gemini-3.5-flash": exhausted}):
+            with self.assertRaises(gemini.AiError) as caught:
+                ai_models.generate("standard", "pitanje")
+        self.assertIn("Automatski", caught.exception.message)
+        self.assertEqual(self.tried, ["gemini-3.5-flash"])
+
     def test_remembered_model_is_forgotten_after_a_week(self):
         """Google ume da vrati besplatnu kvotu - zabrana nije zauvek."""
         old = db.scalar("SELECT datetime('now', ?)", (f"-{ai_models.UNUSABLE_DAYS + 1} days",))
@@ -491,6 +533,48 @@ class NoFreeQuotaErrorTests(AppTestCase):
         error = gemini._http_error(429, "Quota exceeded for metric: x, limit: 15, model: y")
         self.assertFalse(gemini.is_no_free_quota(error))
         self.assertTrue(error.retryable)
+
+    def test_daily_quota_from_the_users_screenshot(self):
+        """Tacan tekst koji je korisnik dobio: 20 poziva dnevno, obnova za 14 h.
+        Pre ovoga je pisalo "Sacekaj minut-dva" i poziv se ponavljao uzalud."""
+        error = gemini._http_error(429, SCREENSHOT_429)
+        self.assertTrue(gemini.is_exhausted(error))
+        self.assertFalse(error.retryable, "ponavljanje za 1,5 s ne pomaze kad je obnova za 14 h")
+        self.assertAlmostEqual(error.retry_after_s, 14 * 3600 + 11 * 60 + 8.212429294, places=3)
+        self.assertIn("Dnevna besplatna kvota", error.message)
+        self.assertIn("20 poziva dnevno", error.message)
+        self.assertIn("oko 14 h", error.message)
+        self.assertNotIn("minut-dva", error.message)
+
+    def test_short_wait_is_waited_out_in_the_same_call(self):
+        error = gemini._http_error(429, "Quota exceeded, limit: 5. Please retry in 4.5s.")
+        self.assertTrue(error.retryable)
+        self.assertEqual(error.retry_after_s, 4.5)
+        self.assertFalse(gemini.is_exhausted(error))
+
+    def test_longer_wait_is_left_to_another_model(self):
+        """Student ne ceka 45 s na rezimeu - drugi model ima svoju kvotu."""
+        error = gemini._http_error(429, "Quota exceeded, limit: 5. Please retry in 45s.")
+        self.assertFalse(error.retryable)
+        self.assertFalse(gemini.is_exhausted(error))
+
+    def test_retry_waits_as_long_as_google_says(self):
+        busy = gemini._http_error(429, "Quota exceeded, limit: 5. Please retry in 4.5s.")
+        answer = mock.MagicMock()
+        answer.__enter__.return_value.read.return_value = b'{"ok": true}'
+        with mock.patch.object(gemini, "_open", side_effect=[busy, answer]), \
+                mock.patch.object(gemini.time, "sleep") as sleep:
+            gemini._request("POST", "https://x", "k", b"{}")
+        sleep.assert_called_once_with(4.5)
+
+
+SCREENSHOT_429 = (
+    "You exceeded your current quota, please check your plan and billing details. For more "
+    "information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. "
+    "To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for "
+    "metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, "
+    "model: gemini-3.6-flash\nPlease retry in 14h11m8.212429294s."
+)
 
 
 class ResetWrittenChoiceMigrationTests(AppTestCase):
