@@ -16,6 +16,7 @@ import random
 from typing import Optional
 
 from .. import db
+from . import duplicates
 
 # Po agresivnosti: (prag savladanosti, mnozilac intervala, udeo savladanih u sesiji)
 _PROFILES = {
@@ -118,8 +119,11 @@ def pick(
 ) -> list[dict]:
     """Izaberi pitanja za sesiju.
 
-    Iz jedne grupe varijacija ide najvise jedno pitanje po sesiji - inace bi
-    korisnik tri puta zaredom dobio istu proveru drugim recima.
+    U jednoj sesiji nikad dvaput isto: ni dva pitanja iz iste grupe
+    varijacija, ni dva ista pitanja iz razlicitih kategorija predmeta
+    (`quiz/duplicates.py`). "Vec bilo" ukljucuje i ono sto je u ovoj sesiji
+    odgovoreno ili preskoceno - sledece pitanje se bira posebno (`limit=1`),
+    pa bi bez toga varijacija upravo odgovorenog pitanja dosla odmah posle njega.
     """
     if not category_ids:
         return []
@@ -128,22 +132,25 @@ def pick(
     rows = _candidates(category_ids, session_id, type_filter, origin)
     if not rows:
         return []
+    seen = _seen_in_session(session_id) if session_id else []
 
     if mode == "new":
         pool = [row for row in rows if row["seen_count"] == 0] or rows
-        return _dedupe_variants(pool, limit)
+        return _without_repeats(pool, limit, seen)
     if mode == "weak":
         pool = sorted(rows, key=lambda row: (row["mastery"], -row["lapses"]))
-        return _dedupe_variants(pool, limit)
+        return _without_repeats(pool, limit, seen)
     if mode == "flagged":
         pool = [row for row in rows if row["flag_review"] or row["pinned"]]
-        return _dedupe_variants(pool, limit)
+        return _without_repeats(pool, limit, seen)
     if mode == "all":
         pool = list(rows)
         random.shuffle(pool)
-        return _dedupe_variants(pool, limit)
+        return _without_repeats(pool, limit, seen)
 
-    return _dedupe_variants(_adaptive_order(rows, mastery_threshold, mastered_share, limit), limit)
+    return _without_repeats(
+        _adaptive_order(rows, mastery_threshold, mastered_share, limit), limit, seen
+    )
 
 
 def _adaptive_order(
@@ -191,9 +198,10 @@ def _adaptive_order(
     return ordered
 
 
-def _dedupe_variants(rows: list[dict], limit: int) -> list[dict]:
-    seen_groups: set[str] = set()
+def _without_repeats(rows: list[dict], limit: int, seen: list[dict]) -> list[dict]:
+    seen_groups = {row["variant_group"] for row in seen if row["variant_group"]}
     seen_ids: set[int] = set()
+    same = duplicates.Index(_comparable(row) for row in seen)
     result: list[dict] = []
     for row in rows:
         if row["id"] in seen_ids:
@@ -201,13 +209,33 @@ def _dedupe_variants(rows: list[dict], limit: int) -> list[dict]:
         group = row["variant_group"] or ""
         if group and group in seen_groups:
             continue
+        question = _comparable(row)
+        if same.match(question):
+            continue
         seen_ids.add(row["id"])
         if group:
             seen_groups.add(group)
+        same.add(question)
         result.append(row)
         if len(result) >= limit:
             break
     return result
+
+
+def _comparable(row: dict) -> dict:
+    return {"type": row["type"], "stem": row["stem"], "payload": db.json_field(row, "payload")}
+
+
+def _seen_in_session(session_id: int) -> list[dict]:
+    """Pitanja koja su u ovoj sesiji vec odgovorena ili preskocena."""
+    return db.query(
+        """
+        SELECT q.type, q.stem, q.payload, q.variant_group FROM question q
+         WHERE q.id IN (SELECT question_id FROM attempt WHERE session_id = ?)
+            OR q.id IN (SELECT question_id FROM session_skip WHERE session_id = ?)
+        """,
+        (session_id, session_id),
+    )
 
 
 def _candidates(
@@ -244,6 +272,7 @@ def _candidates(
     return db.query(
         f"""
         SELECT q.id, q.category_id, q.type, q.variant_group, q.difficulty, q.topic,
+               q.stem, q.payload,
                COALESCE(s.mastery, 0)       AS mastery,
                COALESCE(s.seen_count, 0)    AS seen_count,
                COALESCE(s.lapses, 0)        AS lapses,

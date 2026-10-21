@@ -10,8 +10,9 @@ from typing import Any, Optional
 from .. import db
 from ..ai import contract
 from ..http_util import HttpError
-from ..quiz import grading, scheduler
+from ..quiz import duplicates, grading, scheduler
 from ..quiz import types as question_types
+from . import categories
 
 FLAG_FIELDS = {"flag_review", "flag_check_source", "flag_irrelevant", "flag_wrong", "pinned"}
 
@@ -129,6 +130,11 @@ def insert_many(
     `origin` je 'ai' ili 'exam'. Stavka sme da nosi i `flags` (npr.
     {"flag_check_source": True}) - upisu se u question_meta odmah, da pitanje
     koje treba proveriti bude oznaceno od prvog prikaza.
+
+    AI pitanje se uz to poredi sa svim pitanjima ove kategorije i njenih
+    podkategorija, i sa ostalima iz iste serije (`quiz/duplicates.py`): isto
+    pitanje sa drugacijim pogresnim odgovorom ili zarezom nije novo pitanje.
+    Ispitna pitanja se ne porede tako - ona ulaze doslovno, kao u dokumentu.
     """
     existing = {
         row["content_hash"]
@@ -136,14 +142,19 @@ def insert_many(
             "SELECT content_hash FROM question WHERE category_id = ?", (category_id,)
         )
     }
+    # Obrisana i "zanemari zauvek" pitanja su namerno unutra: inace bi se
+    # vratila kao "nova" pri sledecem generisanju.
+    known = duplicates.Index(_comparable(categories.subtree_ids(category_id))) if origin == "ai" else None
     inserted: list[int] = []
-    duplicates = 0
+    skipped = 0
 
     for item in items:
-        if item["content_hash"] in existing:
-            duplicates += 1
+        if item["content_hash"] in existing or (known and known.match(item)):
+            skipped += 1
             continue
         existing.add(item["content_hash"])
+        if known:
+            known.add(item)
         question_id = db.insert(
             "question",
             {
@@ -169,7 +180,74 @@ def insert_many(
         scheduler.ensure_schedule(question_id, category_id)
         inserted.append(question_id)
 
-    return {"inserted": inserted, "inserted_count": len(inserted), "duplicates": duplicates}
+    return {"inserted": inserted, "inserted_count": len(inserted), "duplicates": skipped}
+
+
+def remove_duplicates(category_id: int) -> dict:
+    """Ukloni (meko) pitanja koja vec postoje u ovoj kategoriji ili ispod nje.
+
+    Za pitanja koja su usla pre nego sto je provera postojala. Iz svake grupe
+    istih ostaje najvrednije: ispitno, pa ono sa beleskom ili oznakom, pa
+    najvise puta vidjeno, pa najstarije. Ne uklanja se nikad:
+    - ispitno pitanje (doslovno je iz dokumenta),
+    - pitanje sa beleskom ili oznakom (to je korisnikov rad),
+    - pitanje ciji par stoji u SUSEDNOJ kategoriji - sesija samo te
+      kategorije bi ga tada izgubila; takve u istoj sesiji sklanja raspored.
+    """
+    categories.get(category_id)
+    ids = categories.subtree_ids(category_id)
+    below = {cid: set(categories.subtree_ids(cid)) for cid in ids}
+
+    rows = _comparable(ids, include_deleted=False)
+    rows.sort(key=lambda row: (row["origin"] != "exam", not _is_marked(row), -row["seen_count"], row["id"]))
+
+    kept = duplicates.Index()
+    removed: list[int] = []
+    for row in rows:
+        twin = kept.match(row)
+        if (twin and row["origin"] != "exam" and not _is_marked(row)
+                and twin["category_id"] in below[row["category_id"]]):
+            removed.append(row["id"])
+            continue
+        kept.add(row)
+
+    if removed:
+        marks = ", ".join("?" for _ in removed)
+        db.execute(
+            f"""
+            UPDATE question_meta SET deleted_at = datetime('now'), updated_at = datetime('now')
+             WHERE question_id IN ({marks})
+            """,
+            removed,
+        )
+    return {"checked": len(rows), "removed": len(removed), "removed_ids": removed}
+
+
+def _comparable(category_ids: list[int], include_deleted: bool = True) -> list[dict]:
+    """Pitanja u obliku koji `quiz/duplicates.py` poredi."""
+    if not category_ids:
+        return []
+    marks = ", ".join("?" for _ in category_ids)
+    deleted_clause = "" if include_deleted else "AND COALESCE(m.deleted_at, '') = ''"
+    rows = db.query(
+        f"""
+        SELECT q.id, q.category_id, q.type, q.stem, q.payload, q.origin,
+               COALESCE(m.note, '') AS note, COALESCE(s.seen_count, 0) AS seen_count,
+               {", ".join(f"COALESCE(m.{flag}, 0) AS {flag}" for flag in sorted(FLAG_FIELDS))}
+          FROM question q
+          LEFT JOIN question_meta m     ON m.question_id = q.id
+          LEFT JOIN question_schedule s ON s.question_id = q.id
+         WHERE q.category_id IN ({marks}) {deleted_clause}
+        """,
+        category_ids,
+    )
+    for row in rows:
+        row["payload"] = db.json_field(row, "payload")
+    return rows
+
+
+def _is_marked(row: dict) -> bool:
+    return bool(row["note"]) or any(row[flag] for flag in FLAG_FIELDS)
 
 
 def list_for(

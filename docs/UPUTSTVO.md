@@ -194,6 +194,21 @@ dobiješ izveštaj: koliko je novih, koliko duplikata, i **šta je odbijeno i za
 Odbijena pitanja nisu greška aplikacije — to je zaštita. Pitanje kome fali tačan
 odgovor ili koje ima praznine bez oznaka ne ulazi u bazu polomljeno.
 
+### Duplikati
+
+Novo pitanje se uporedi sa svim pitanjima te kategorije i njenih podkategorija,
+i sa ostalima iz iste serije. **Isto pitanje** = isti način odgovaranja + isti
+tačan odgovor + skoro isti tekst. Takvo ne ulazi, i broji se u „duplikata".
+Isto gradivo pitano drugačije (jednom *zaokruži*, drugi put *dopuni*) **ulazi** —
+to je druga provera znanja.
+
+U jednoj sesiji nikad ne dobiješ isto pitanje dvaput, ni varijaciju pitanja na
+koje si već odgovorio.
+
+Za duplikate koji su ušli ranije: tab **Pitanja → 🧹 Ukloni duplikate**. Ostaje
+jedno od svakih istih (ono na kome imaš napredak). Pitanja sa beleškom ili
+oznakom i ispitna pitanja se ne diraju.
+
 ### Ako Gemini ne uspe
 
 Ponekad model ne može da svari format, ili si potrošio kvotu. Tada:

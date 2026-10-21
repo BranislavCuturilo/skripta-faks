@@ -91,7 +91,7 @@ FOOTER = """
 
 | Hoću da... | Diram |
 |---|---|
-| dodam novi tip pitanja | `app/quiz/types.py` (registar + validator), `app/quiz/grading.py` (ocenjivač), `web/js/render.js` (crtanje) — sva tri, uvek |
+| dodam novi tip pitanja | `app/quiz/types.py` (registar + validator), `app/quiz/grading.py` (ocenjivač), `web/js/render.js` (crtanje) — sva tri, uvek; plus tačan odgovor u `app/quiz/duplicates.py` |
 | promenim kako se bira sledeće pitanje | `app/quiz/scheduler.py` |
 | promenim šta se šalje modelu | `app/ai/prompts.py` |
 | promenim koliko dugo se čeka na AI ocenu | konstante `GRADE_*` na vrhu `app/services/study.py` |

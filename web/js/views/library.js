@@ -57,14 +57,40 @@ export async function questions(root, categoryId) {
     el('div', { class: 'card' }, [
       el('div', { class: 'card__body' }, [
         el('div', { class: 'row2' }, [search, el('div', { class: 'flex' }, [typeSelect, flagSelect])]),
-        el('label', { class: 'checkline mt1' }, [
-          el('input', { type: 'checkbox', checked: true,
-                        onChange: (event) => { filters.subtree = event.target.checked ? 1 : 0; draw(); } }),
-          'Uključi podkategorije',
+        el('div', { class: 'flex-between mt1' }, [
+          el('label', { class: 'checkline' }, [
+            el('input', { type: 'checkbox', checked: true,
+                          onChange: (event) => { filters.subtree = event.target.checked ? 1 : 0; draw(); } }),
+            'Uključi podkategorije',
+          ]),
+          el('button', {
+            class: 'btn btn--sm', text: '🧹 Ukloni duplikate',
+            title: 'Isto pitanje, isti tačan odgovor, isti način odgovaranja — ostaje jedno',
+            onClick: removeDuplicates,
+          }),
         ]),
       ]),
     ]),
     listBox);
+
+  async function removeDuplicates(event) {
+    const button = event.currentTarget;
+    if (!await confirmDialog('Ukloniti duplikate?',
+      'Ostaje jedno od svakih istih pitanja (isti tekst, isti tačan odgovor, isti tip). ' +
+      'Pitanja sa beleškom ili oznakom i ispitna pitanja se ne diraju.', 'Ukloni')) return;
+    button.disabled = true;
+    try {
+      const result = await api.post(`/api/categories/${categoryId}/questions/dedupe`, {});
+      toast(result.removed
+        ? `Uklonjeno duplikata: ${result.removed} (provereno ${result.checked})`
+        : `Nema duplikata (provereno ${result.checked})`, 'good');
+      reloadTree();
+      draw();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+    button.disabled = false;
+  }
 
   draw();
 }

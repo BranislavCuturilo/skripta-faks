@@ -36,6 +36,12 @@ def list_questions(request: Request) -> Response:
     )
 
 
+@router.post("/api/categories/<int:category_id>/questions/dedupe")
+def remove_duplicate_questions(request: Request) -> Response:
+    """Pitanja koja su se ponovila pre nego sto je provera duplikata postojala."""
+    return json_response({"ok": True, **questions.remove_duplicates(request.params["category_id"])})
+
+
 @router.get("/api/questions/<int:question_id>")
 def read_question(request: Request) -> Response:
     question_id = request.params["question_id"]

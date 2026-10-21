@@ -242,6 +242,30 @@ nađeno, odbija se sa razlogom. Odgovor koji je odredio model (dokument ga nije
 imao) nosi `flag_check_source` od prvog prikaza. Sesija učenja ima
 `origin_filter` da se vežbaju samo ta pitanja.
 
+### Duplikat je ono što student oseti kao isto pitanje, ne isti bajtovi
+
+`content_hash` hvata samo bajt-isto pitanje u istoj kategoriji; jedan drugačiji
+pogrešan odgovor ili jedna reč više i isto pitanje je ulazilo ponovo.
+`app/quiz/duplicates.py` zato poredi: **isti tip + isti tačan odgovor + tekst
+≥ 85 % sličan, sa istim brojevima** („Izračunaj 2+2" i „1+3" imaju isti odgovor,
+a nisu isti zadatak). Pogrešni ponuđeni odgovori ne ulaze u poređenje. Drugi
+tip na istu temu nije duplikat — dogovor sa korisnikom. Pitanja se grupišu po
+(tip, tačan odgovor), pa se tekst poredi samo unutar grupe.
+
+Pravilo drže tri mesta, sva pinovana u `tests/test_duplicates.py`:
+
+- **upis** (`questions.insert_many`): AI pitanje se poredi sa celim podstablom
+  ciljne kategorije (i obrisanim i zanemarenim — inače bi se vratila kao nova)
+  i sa ostatkom serije. Ispitna pitanja ulaze doslovno, bez toga.
+- **sesija** (`scheduler.pick`): nikad dvaput isto ni dve varijacije iste
+  grupe, računajući i ono što je u sesiji već odgovoreno ili preskočeno.
+  Sledeće pitanje se bira posebno (`limit=1`); ranije ta odluka nije znala za
+  već odgovorena, pa je varijacija upravo odgovorenog pitanja dolazila odmah.
+- **čišćenje** (`questions.remove_duplicates`, dugme u tabu Pitanja): meko
+  briše kopije koje su ušle ranije. Ne dira ispitna pitanja, pitanja sa
+  beleškom ili oznakom, ni pitanje čiji par stoji u **susednoj** kategoriji —
+  sesija samo te kategorije bi ga izgubila.
+
 ## Bezbednost, koliko je lokalnoj aplikaciji potrebno
 
 Server sluša na `0.0.0.0` — to je ono što omogućava telefon na istom Wi-Fi-ju.
