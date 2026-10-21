@@ -14,16 +14,19 @@ from .. import db
 DEFAULTS: dict[str, Any] = {
     "gemini_api_key": "",
     "provider": "gemini",
-    # Prazno = automatski. Naziv modela se NE upisuje ovde tvrdo: Google ih
-    # penzionise, a aplikacija koja nosi zamrznut naziv jednog dana prestane da
-    # radi bez objasnjenja. Izbor pravi `services/ai_models.py` iz spiska koji
-    # vrati sam kljuc; ovde zavrsi tek kad je razresen ili rucno izabran.
+    # Prazno = automatski: uvek najnoviji model sa kljuca. Ovde stoji SAMO ono
+    # sto je korisnik rucno izabrao - automatski izbor se razresava pri svakom
+    # pozivu (`services/ai_models.py`) i nikad se ne upisuje, jer bi se upisan
+    # naziv posle ponasao kao rucni izbor i zamrznuo model.
     "model_fast": "",
     "model_standard": "",
     "model_strong": "",
     "model_tts": "",
     "models_available": "[]",
     "models_checked_at": "",
+    # {naziv: kada} - modeli koji ne rade sa ovim kljucem (nestali, bez
+    # besplatne kvote); automatski izbor ih preskace nekoliko dana.
+    "models_unusable": "{}",
     "ui_language": "sr",
     "question_language": "sr",
     # 1 = opusteno ("moze po nesto i da ne znam"), 5 = "moram sve da znam"

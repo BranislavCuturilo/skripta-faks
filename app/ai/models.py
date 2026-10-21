@@ -4,14 +4,20 @@ Nazivi Gemini modela se menjaju brze nego sto se ova aplikacija azurira. Kad su
 bili tvrdo upisani (`gemini-2.5-flash`), Google ih je penzionisao i aplikacija
 je prestala da radi bez ijedne poruke koja bi rekla zasto.
 
-Zato ovde nema jednog naziva nego REDOSLED ZELJA po nivou. Pravi izbor se radi
-u toku rada, iz spiska koji vrati sam kljuc korisnika:
+Zato se ovde ne bira po nazivu nego po OBLIKU, iz spiska koji vrati sam kljuc
+korisnika: uvek NAJNOVIJI stabilan model odgovarajuce familije. Kad Google
+izbaci novu generaciju, ona se koristi cim se spisak osvezi - bez izmene koda i
+bez ijednog klika korisnika.
 
-1. uzmi prvi iz liste zelja koji taj kljuc stvarno ima
-2. ako nijedan ne postoji (Google je opet preimenovao sve), izaberi heuristikom
-   iz onoga sto postoji - najveca verzija, pa odgovarajuca familija
+Redosled (`_score`), od najvaznijeg:
+1. naziv sa verzijom (alias `gemini-flash-latest` ne kaze verziju, pa ni koje
+   polje za razmisljanje prima)
+2. stabilan pre preview-a - preview obicno nema besplatnu kvotu ("limit: 0")
+3. najnovija generacija (4.x pre 3.x)
+4. oblik za nivo (lite za brzi, pro za najjaci, obican flash za standardni)
+5. najveca verzija unutar generacije
 
-Drugi korak je ono zbog cega ovo prezivljava sledece preimenovanje.
+`PREFERRED` je samo za trenutak pre nego sto je spisak sa kljuca procitan.
 """
 
 import re
@@ -19,8 +25,8 @@ from typing import Iterable, Optional
 
 TIERS = ("fast", "standard", "strong", "tts")
 
-# Stanje na dan 13.08.2026. Novije ide prvo. Stari nazivi ostaju na dnu jer
-# poneki kljuc jos uvek ima pristup samo njima.
+# Samo dok spisak sa kljuca jos nije procitan (prvo pokretanje, bez mreze).
+# Cim spisak stigne, bira se po obliku iz njega - ova lista tada ne vazi.
 PREFERRED: dict[str, list[str]] = {
     # sitni poslovi - najjeftinije sto radi posao
     "fast": [
@@ -50,10 +56,13 @@ PREFERRED: dict[str, list[str]] = {
     ],
 }
 
-# Modeli koji nisu za tekst: slika, video, ugradjivanje, zivi audio.
-_NOT_TEXT = ("image", "imagen", "veo", "embedding", "embed", "aqa", "live", "native-audio")
+# Modeli koji nisu za tekst: slika, video, ugradjivanje, zivi audio, upravljanje
+# racunarom i robotima.
+_NOT_TEXT = ("image", "imagen", "veo", "embedding", "embed", "aqa", "live", "native-audio",
+             "computer-use", "robotics")
 
 _VERSION = re.compile(r"gemini-(\d+(?:\.\d+)?)")
+_UNSTABLE = re.compile(r"(?:^|-)(?:preview|exp|experimental)(?:-|$)")
 
 
 def preferred(tier: str) -> list[str]:
@@ -65,29 +74,36 @@ def default_for(tier: str) -> str:
     return preferred(tier)[0]
 
 
-def resolve(tier: str, available: Iterable[str]) -> Optional[str]:
-    """Najbolji model za dati nivo iz onoga sto kljuc stvarno ima."""
-    names = [str(item) for item in available if item]
-    if not names:
-        return None
-
-    existing = set(names)
-    for candidate in preferred(tier):
-        if candidate in existing:
-            return candidate
-
-    # Nijedan poznat naziv - Google je preimenovao familiju. Biraj po obliku.
-    ranked = sorted(
+def ranked(tier: str, available: Iterable[str]) -> list[str]:
+    """Svi modeli sa kljuca koji odgovaraju nivou, od najboljeg ka najgorem."""
+    names = {str(item) for item in available if item}
+    return sorted(
         (name for name in names if _fits(tier, name)),
         key=lambda name: _score(tier, name),
         reverse=True,
     )
-    return ranked[0] if ranked else None
+
+
+def resolve(tier: str, available: Iterable[str], skip: Iterable[str] = ()) -> Optional[str]:
+    """Najbolji model za dati nivo iz onoga sto kljuc stvarno ima.
+
+    `skip` su modeli za koje se zna da ne rade sa ovim kljucem (nema besplatne
+    kvote, nestali su) - preskacu se, pa ide sledeci najnoviji.
+    """
+    skipped = set(skip)
+    for name in ranked(tier, available):
+        if name not in skipped:
+            return name
+    return None
 
 
 def resolve_all(available: Iterable[str]) -> dict[str, Optional[str]]:
     names = list(available)
     return {tier: resolve(tier, names) for tier in TIERS}
+
+
+def is_preview(name: str) -> bool:
+    return bool(_UNSTABLE.search(name.lower()))
 
 
 def is_retired(name: str) -> bool:
@@ -137,11 +153,11 @@ def _version_of(name: str) -> Optional[float]:
 
 
 def _score(tier: str, name: str) -> tuple:
+    """Kljuc za poredjenje - redosled je objasnjen na vrhu modula."""
     lowered = name.lower()
-    version = _version_of(lowered) or 0.0
+    version = _version_of(lowered)
     is_lite = "lite" in lowered
     is_pro = "pro" in lowered
-    is_preview = "preview" in lowered
 
     if tier == "fast":
         shape = 2 if is_lite else (1 if not is_pro else 0)
@@ -150,5 +166,11 @@ def _score(tier: str, name: str) -> tuple:
     else:
         shape = 0 if is_lite else (2 if not is_pro else 1)
 
-    # Stabilno pre preview-a kad je sve ostalo isto.
-    return (shape, version, 0 if is_preview else 1, -len(name))
+    return (
+        version is not None,
+        not is_preview(lowered),
+        int(version or 0),
+        shape,
+        version or 0.0,
+        -len(name),
+    )

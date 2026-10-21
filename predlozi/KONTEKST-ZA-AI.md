@@ -62,8 +62,8 @@ aplikacija uopšte ovako izgleda.
 | `app/__init__.py` | 3 | skripta-faks: lokalna aplikacija za ucenje uz pomoc AI-ja, bez zavisnosti. |
 | `app/ai/__init__.py` | 6 | AI sloj: klijent, promptovi i ugovor o formatu odgovora. |
 | `app/ai/contract.py` | 233 | Ugovor o formatu izmedju aplikacije i bilo kog modela. |
-| `app/ai/gemini.py` | 361 | Gemini klijent na urllib. |
-| `app/ai/models.py` | 154 | Koji se model zove za koji posao. |
+| `app/ai/gemini.py` | 378 | Gemini klijent na urllib. |
+| `app/ai/models.py` | 176 | Koji se model zove za koji posao. |
 | `app/ai/prompts.py` | 539 | Sablonski promptovi. |
 | `app/ai/tts.py` | 120 | Izgovor teksta. |
 | `app/api/__init__.py` | 13 | Registracija ruta. Uvoz modula je ono sto puni ruter, pa svi moraju da se |
@@ -78,7 +78,7 @@ aplikacija uopšte ovako izgleda.
 | `app/api/study.py` | 125 | Rute za ucenje: sesija, sledece pitanje, odgovor, preskakanje, rezime. |
 | `app/api/update.py` | 41 | Rute za samo-azuriranje aplikacije. |
 | `app/config.py` | 85 | Putanje i podrazumevane vrednosti. Jedino mesto koje zna gde sta stoji. |
-| `app/db.py` | 463 | SQLite sloj: konekcija po niti, semа u migracijama, sitni upitni helperi. |
+| `app/db.py` | 474 | SQLite sloj: konekcija po niti, semа u migracijama, sitni upitni helperi. |
 | `app/extract/__init__.py` | 110 | Ekstrakcija teksta iz uploadovanih materijala. |
 | `app/extract/chunking.py` | 133 | Deljenje izvucenog teksta na komade koji staju u jedan AI poziv. |
 | `app/extract/exam_parser.py` | 395 | Prepoznavanje gotove liste ispitnih pitanja u obicnom tekstu - BEZ AI-ja. |
@@ -94,7 +94,7 @@ aplikacija uopšte ovako izgleda.
 | `app/router.py` | 107 | Minimalni ruter: sablon putanje -> funkcija. |
 | `app/server.py` | 259 | HTTP server nad standardnom bibliotekom. |
 | `app/services/__init__.py` | 1 | Poslovna logika. Rute u app/api su tanke i samo zovu ovo. |
-| `app/services/ai_models.py` | 152 | Izbor modela u toku rada, sa samopopravljanjem. |
+| `app/services/ai_models.py` | 248 | Izbor modela u toku rada, sa samopopravljanjem. |
 | `app/services/categories.py` | 293 | Kategorije: samo-referentno stablo bez ogranicenja dubine. |
 | `app/services/exam_import.py` | 452 | Uvoz fiksne liste ispitnih pitanja - DOSLOVNO, bez AI prepravljanja. |
 | `app/services/generation.py` | 463 | Generisanje pitanja iz materijala. |
@@ -103,7 +103,7 @@ aplikacija uopšte ovako izgleda.
 | `app/services/notes.py` | 116 | AI dopune materijala. |
 | `app/services/proposals.py` | 316 | Predlozi za nadogradnju same aplikacije. |
 | `app/services/questions.py` | 417 | Pitanja: upis iz generisanja, citanje, korisnikove beleske i flagovi. |
-| `app/services/settings_store.py` | 120 | Podesavanja: kljuc-vrednost u bazi, sa tipiziranim podrazumevanim vrednostima. |
+| `app/services/settings_store.py` | 123 | Podesavanja: kljuc-vrednost u bazi, sa tipiziranim podrazumevanim vrednostima. |
 | `app/services/strategy.py` | 315 | Adaptivna strategija: kako sistem menja nacin na koji te ispituje. |
 | `app/services/study.py` | 661 | Sesija ucenja: izbor pitanja, ocenjivanje, objasnjenja. |
 | `app/services/updater.py` | 309 | Samo-azuriranje: provera nove verzije na GitHub-u i ugradnja preko sebe. |
@@ -129,7 +129,7 @@ Ulazne tačke: `run.py` (pokretanje), `run_tests.py` (testovi), `mapa.py` (ovaj 
 | `web/js/views/library.js` | 448 | Pitanja, strategija i dopune - sve što se gleda van sesije učenja. |
 | `web/js/views/network.js` | 98 | Kartica "otvori na telefonu". |
 | `web/js/views/proposals.js` | 229 | Predlozi za nadogradnju same aplikacije. |
-| `web/js/views/settings.js` | 352 | Podešavanja: AI ključ, modeli, agresivnost, govor, izgled, potrošnja. |
+| `web/js/views/settings.js` | 353 | Podešavanja: AI ključ, modeli, agresivnost, govor, izgled, potrošnja. |
 | `web/js/views/study.js` | 566 | Ekran ucenja: podesavanje sesije, petlja pitanja, rezime. |
 | `web/js/views/update.js` | 143 | Kartica „Verzija i ažuriranje". |
 

@@ -111,7 +111,7 @@ U **Podešavanja → Potrošnja AI poziva** vidiš tačno koliko je poziva otiš
 
 | Opcija | Šta radi |
 |---|---|
-| **Modeli** (brz / standardni / najjači / glas) | Koji se model zove za koji posao. Ostavi **Automatski** — aplikacija bira iz spiska koji vrati tvoj ključ i sama pređe na noviji kad ovaj bude penzionisan. Ručno biraš samo ako želiš baš određeni. Dugme *Osveži spisak modela* traži novu listu od Google-a. |
+| **Modeli** (brz / standardni / najjači / glas) | Koji se model zove za koji posao. Ostavi **Automatski** — aplikacija uvek koristi **najnoviji stabilan** model koji tvoj ključ ima i sama pređe na noviji čim ga Google izbaci (spisak se osvežava jednom dnevno, bez klika). Model koji tvoj ključ ne može da koristi (nema besplatne kvote) sama preskoči. Ručno biraš samo ako baš želiš određeni. Dugme *Osveži spisak modela* traži novu listu odmah. |
 | **Agresivnost (1–5)** | Koliko strogo se meri da nešto „znaš". 1 = *može po nešto i da ne znam* (prag 70%, duži razmaci). 5 = *moram sve da znam* (prag 95%, sve se vrti češće). |
 | **Pitanja po sesiji** | Koliko pitanja planira jedna sesija. |
 | **Varijacija po pitanju** | Koliko puta se ista provera znanja postavi iz drugog ugla. 0 = bez varijacija. U jednoj sesiji vidiš najviše jednu iz grupe. |

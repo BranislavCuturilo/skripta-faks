@@ -310,6 +310,17 @@ migration(
     """
 )
 
+migration(
+    """
+    -- Starije osvezavanje spiska modela je UPISIVALO automatski izbor u
+    -- model_*, pa se on od tada ponasao kao rucni izbor i nikad se vise nije
+    -- menjao. Rucni i tako upisani izbor se ne razlikuju, pa se svi vracaju na
+    -- automatski (= uvek najnoviji) - to je i cilj: korisnik ne bira model.
+    UPDATE setting SET value = ''
+     WHERE key IN ('model_fast', 'model_standard', 'model_strong', 'model_tts');
+    """
+)
+
 
 def connect() -> sqlite3.Connection:
     conn = getattr(_local, "conn", None)

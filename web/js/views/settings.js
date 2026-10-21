@@ -119,9 +119,10 @@ export async function settings(root) {
 
     mount(modelBox,
       el('div', { class: 'small muted mb2' }, [
-        'Nazivi Gemini modela se menjaju — aplikacija ih zato ne drži tvrdo upisane nego bira ',
-        'iz spiska koji vrati tvoj ključ. Ostavi „Automatski" i sam će preći na noviji kad ovaj ',
-        'bude penzionisan.',
+        'Ostavi „Automatski": aplikacija uvek koristi najnoviji stabilan model koji tvoj ključ ',
+        'ima, i sama pređe na noviji čim ga Google izbaci — spisak se osvežava jednom dnevno. ',
+        'Model koji tvoj ključ ne može da koristi (nema besplatne kvote) sama preskoči. ',
+        'Ručno biraj samo ako baš želiš određeni model.',
       ]),
       ...TIERS.map(picker),
       el('div', { class: 'btn-row mt1' }, [

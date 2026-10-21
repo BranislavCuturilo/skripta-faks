@@ -9,6 +9,7 @@ import base64
 import json
 import mimetypes
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -33,6 +34,10 @@ RETRY_STATUSES = {429, 500, 502, 503, 504}
 MAX_ATTEMPTS = 4
 DEFAULT_TIMEOUT_S = 300.0
 
+# 429 sa "limit: 0" nije "sacekaj minut" nego "ovaj model nema besplatnu kvotu
+# za tvoj kljuc" - tipicno nov preview. Ponavljanje ne pomaze, pomaze drugi model.
+_NO_FREE_QUOTA = re.compile(r"\blimit:\s*0\b")
+
 
 class AiError(Exception):
     def __init__(self, message: str, status: Optional[int] = None, retryable: bool = False):
@@ -40,6 +45,10 @@ class AiError(Exception):
         self.message = message
         self.status = status
         self.retryable = retryable
+
+
+def is_no_free_quota(exc: AiError) -> bool:
+    return exc.status == 429 and bool(_NO_FREE_QUOTA.search(exc.message or ""))
 
 
 def generate(
@@ -277,11 +286,7 @@ def _open(request: urllib.request.Request, timeout_s: float = DEFAULT_TIMEOUT_S)
             detail = (payload.get("error") or {}).get("message", "")
         except Exception:  # noqa: BLE001 - telo greske sme da bude bilo sta
             detail = ""
-        raise AiError(
-            _friendly(exc.code, detail),
-            status=exc.code,
-            retryable=exc.code in RETRY_STATUSES,
-        ) from None
+        raise _http_error(exc.code, detail) from None
     except urllib.error.URLError as exc:
         raise AiError(f"Nema veze sa internetom ili je Google nedostupan ({exc.reason}).",
                       retryable=True) from None
@@ -289,7 +294,16 @@ def _open(request: urllib.request.Request, timeout_s: float = DEFAULT_TIMEOUT_S)
         raise AiError("Poziv je istekao (timeout).", retryable=True) from None
 
 
-def _friendly(status: int, detail: str) -> str:
+def _http_error(status: int, detail: str) -> AiError:
+    no_free_quota = status == 429 and bool(_NO_FREE_QUOTA.search(detail))
+    return AiError(
+        _friendly(status, detail, no_free_quota),
+        status=status,
+        retryable=status in RETRY_STATUSES and not no_free_quota,
+    )
+
+
+def _friendly(status: int, detail: str, no_free_quota: bool = False) -> str:
     """Poruka iz koje se vidi STA da se uradi, ne samo da nesto ne valja.
 
     401 i 403 su ovde najvazniji: Google gasi stari tip kljuca ("standard") i
@@ -314,6 +328,9 @@ def _friendly(status: int, detail: str) -> str:
         503: "Model je trenutno preopterećen. Probaj ponovo za koji minut.",
     }
     base = messages.get(status, f"Poziv nije uspeo (HTTP {status}).")
+    if no_free_quota:
+        base = ("Ovaj model nema besplatnu kvotu za tvoj ključ — Google ga naplaćuje "
+                "(najčešće nov preview). Čekanje ne pomaže; aplikacija prelazi na drugi model.")
     return f"{base} {detail}".strip() if detail else base
 
 

@@ -105,22 +105,31 @@ Google ih je penzionisao, a odvojeno od toga počeo i da gasi stari tip API
 ključa — i aplikacija je prestala da radi uz poruku koja korisniku nije značila
 ništa.
 
-Zato `app/ai/models.py` ne drži jedan naziv nego **redosled želja po nivou**
-(brz / standardni / najjači / glas), a `app/services/ai_models.py` pravi izbor
-u toku rada:
+Zato se model bira **po obliku, ne po nazivu**, iz spiska koji vrati sam ključ
+(`ListModels`): uvek **najnoviji stabilan** model odgovarajuće familije
+(`lite` za brzi, običan flash za standardni, `pro` za najjači). Redosled u
+`models._score`: naziv sa verzijom → stabilan pre preview-a → najnovija
+generacija → oblik → najveća verzija. Preview ide tek kad stabilnog nema, jer
+nov preview obično nema besplatnu kvotu. Aliasi tipa `gemini-flash-latest` idu
+na kraj: ne kažu verziju, pa ni koje polje za razmišljanje model prima.
+`PREFERRED` važi samo dok spisak još nije pročitan.
 
-1. uzmi prvi iz liste želja koji korisnikov ključ **stvarno ima** (`ListModels`)
-2. ako nijedan ne postoji — Google je opet preimenovao familiju — biraj
-   heuristikom iz onoga što postoji: najveća verzija, pa odgovarajući oblik
-   (`lite` za brzi, `pro` za najjači, slike i ugrađivanja se izbacuju)
+Korisnik ne bira ništa — pinovano u `tests/test_ai_models.py`:
 
-Drugi korak je ono zbog čega ovo preživljava **sledeće** preimenovanje, i pinovan
-je testom na izmišljenoj `gemini-4.2` familiji u kojoj nijedan naziv nije poznat.
-
-Uz to, `ai_models.generate()` na grešku „model ne postoji" jednom osveži spisak,
-prepravi izbor i ponovi poziv — pa se penzionisanje vidi kao obaveštenje, ne kao
-kvar. Ručni izbor korisnika se poštuje, osim kad model nestane ili je iz familije
-koja se gasi; tada se menja i **prijavi**.
+- **Automatski izbor se nigde ne upisuje.** U `model_<nivo>` stoji samo ručni
+  izbor; prazno = automatski i razrešava se pri svakom pozivu. Prva verzija je
+  pri osvežavanju **upisivala** razrešen naziv, pa je „Automatski" tiho postajao
+  ručni izbor i nova generacija se nikad nije koristila — zbog toga su korisnici
+  menjali model ručno. Migracija 7 vraća sve tako upisane izbore na automatski.
+- **Spisak se osvežava sam**, jednom dnevno: na startu (u pozadini) i pred poziv
+  (`refresh_if_stale`). Neuspelo osvežavanje se ne ponavlja pred svaki poziv.
+- **Model koji ne radi sa ključem se preskače u istom pozivu.** Nestao (404) ili
+  bez besplatne kvote (429 sa `limit: 0`, koji se zato ni ne ponavlja) — pamti se
+  7 dana u `models_unusable` i ide sledeći najnoviji. Obična potrošena kvota
+  menja model samo za taj poziv, jer svaki model ima svoju kvotu. Najviše dve
+  zamene po pozivu — posle toga je kriv ključ ili mreža.
+- Ručni izbor se poštuje, osim kad model nestane ili je iz familije koja se
+  gasi; tada se vraća na automatski i **prijavi**.
 
 ### AI se zove samo kad mora
 
@@ -259,7 +268,7 @@ fajl ne napušta mašinu i van je gita.
 
 ## Testovi
 
-271 test, `python run_tests.py`. Bez pytest-a — `unittest` je u standardnoj
+294 testa, `python run_tests.py`. Bez pytest-a — `unittest` je u standardnoj
 biblioteci.
 
 Dva nezavisna predohrana, oba pinovana testom koji ih namerno ruši:

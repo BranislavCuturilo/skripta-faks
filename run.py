@@ -25,6 +25,7 @@ if _installed:
     print(f"  Ugradjena nova verzija: {_installed.get('version', '?')}")
 
 from app import config, db, netinfo, server  # noqa: E402  - uvoz servera registruje i rute
+from app.services import ai_models  # noqa: E402
 
 
 BANNER = r"""
@@ -45,6 +46,9 @@ def main() -> int:
     if applied:
         print(f"  Baza: primenjeno migracija: {applied}")
     print(f"  Baza: {config.DB_PATH}")
+    # Spisak modela se osvezi u pozadini, da ekran podesavanja i prvi poziv
+    # vide najnoviji model - start ne ceka na mrezu.
+    threading.Thread(target=ai_models.refresh_if_stale, name="models-refresh", daemon=True).start()
 
     port = server.find_free_port(config.DEFAULT_PORT, config.PORT_SEARCH_RANGE)
     httpd = server.build(port)
