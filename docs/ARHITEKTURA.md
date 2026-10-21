@@ -266,6 +266,30 @@ Pravilo drže tri mesta, sva pinovana u `tests/test_duplicates.py`:
   beleškom ili oznakom, ni pitanje čiji par stoji u **susednoj** kategoriji —
   sesija samo te kategorije bi ga izgubila.
 
+### Ažuriranje: poslednji commit na `main`, git ili ZIP
+
+Prva verzija je pitala GitHub `releases/latest`. Release se nikad ne pravi,
+odgovor je bio 404, provera je uvek govorila „imaš najnoviju" — ažuriranje nije
+radilo nikad. Sada je izvor istine `commits/main`, a koliko je instalacija iza
+kaže `compare` od instaliranog commit-a (`.git/HEAD` bez git-a, ili
+`verzija.json` kod ZIP instalacije). Commit koji GitHub ne zna (neposlate
+izmene na mašini na kojoj se programira) ne dobija ponudu.
+
+Git kopija se ažurira sa `git pull --ff-only`, ne ZIP-om: ZIP preko git kopije
+ostavlja izmenjeno radno stablo i sledeći `git pull` odbije. `--ff-only` nikad
+ne spaja i ne briše lokalne izmene.
+
+`START.bat` i `azuriraj.bat` se **prepisuju dok se izvršavaju**, a cmd čita
+.bat red po red sa diska — posle prepisivanja nastavlja na istom bajtu u novom
+fajlu. Proba u sandbox-u sa starim `START.bat`-om: posle ugradnje je cmd
+pokušao da izvrši reč iz komentara novog fajla. Zato: svaki korak koji menja
+fajlove je u bloku `( ... )` koji se završava sa `exit` (blok se pročita ceo
+pre izvršavanja), `azuriraj.bat` sebe kopira tek u poslednjem bloku, nema
+`goto` ni labela (ZIP stiže sa LF krajevima), `findstr` umesto `find` (Git za
+Windows ume da stavi Unix `find` ispred), i puna putanja `%~dp0azuriraj.bat`
+(uz `NoDefaultCurrentDirectoryInExePath` cmd ne traži u tekućem folderu).
+Pinovano statičkim testovima u `tests/test_updater.py`.
+
 ## Bezbednost, koliko je lokalnoj aplikaciji potrebno
 
 Server sluša na `0.0.0.0` — to je ono što omogućava telefon na istom Wi-Fi-ju.
@@ -292,7 +316,7 @@ fajl ne napušta mašinu i van je gita.
 
 ## Testovi
 
-294 testa, `python run_tests.py`. Bez pytest-a — `unittest` je u standardnoj
+333 testa, `python run_tests.py`. Bez pytest-a — `unittest` je u standardnoj
 biblioteci.
 
 Dva nezavisna predohrana, oba pinovana testom koji ih namerno ruši:

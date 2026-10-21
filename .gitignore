@@ -24,3 +24,6 @@ secrets.json
 
 # Staging folder samo-azuriranja: preuzeta verzija koja ceka restart.
 .update/
+
+# Instalirani commit ZIP instalacije - pise ga samo-azuriranje, ne ide u git.
+verzija.json

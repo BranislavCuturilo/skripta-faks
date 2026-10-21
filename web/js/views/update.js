@@ -105,7 +105,8 @@ export function updateCard() {
                   text: 'Vidi šta se menja' }),
       ]),
       el('div', { class: 'field__hint mt1',
-                  text: 'Tvoja pitanja, materijali i napredak se ne diraju — menja se samo kod.' }),
+                  text: 'Tvoja pitanja, materijali i napredak se ne diraju — menja se samo kod.' +
+                        (state.kind === 'git' ? ' Ova kopija je iz git-a: ažurira se sa git pull.' : '') }),
       current);
   }
 
@@ -126,7 +127,7 @@ export function updateCard() {
 
     try {
       const { job } = await api.post('/api/update/download',
-                                     { version: state.latest, url: state.download });
+                                     { version: state.latest_sha, url: state.download });
       const finished = await followJob(job.id, (tick) => {
         mount(progress, el('div', { class: 'spinner' }), tick.message || 'Preuzimam...');
       });

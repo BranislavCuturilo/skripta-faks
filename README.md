@@ -41,11 +41,13 @@ Za AI funkcije treba ti besplatan **Gemini API kljuc**
 
 ## Azuriranje
 
-U aplikaciji: **Podesavanja → Verzija i azuriranje → Preuzmi i azuriraj**.
+U aplikaciji: **Podesavanja → Verzija i azuriranje → Preuzmi i azuriraj** —
+ugradi se pri sledecem pokretanju. Ili **dupli klik na `azuriraj.bat`** —
+azurira odmah.
 
-Nova verzija se preuzme odmah, a ugradi se pri sledecem pokretanju — dok
-aplikacija radi, drzi svoje fajlove otvorene i ne moze da ih prepise ispod
-sebe. Znaci: klikni preuzmi, zatvori aplikaciju, pokreni je ponovo.
+Nova verzija je poslednji commit na `main`. Git kopija se azurira sa
+`git pull --ff-only` (lokalne izmene se nikad ne brisu), instalacija iz
+`instaliraj.bat` preuzima ZIP.
 
 Tvoja pitanja, materijali i napredak se pri azuriranju ne diraju.
 

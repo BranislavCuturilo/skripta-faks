@@ -73,7 +73,7 @@ aplikacija uopšte ovako izgleda.
 | `app/api/materials.py` | 112 | Rute za materijale: upload, obrada, pregled. |
 | `app/api/meta.py` | 60 | Zdravlje aplikacije i jedan poziv koji browser radi na startu. |
 | `app/api/proposals.py` | 84 | Rute za predloge nadogradnje aplikacije. |
-| `app/api/questions.py` | 79 | Rute za pitanja: pregled, izmena, beleske i flagovi. |
+| `app/api/questions.py` | 85 | Rute za pitanja: pregled, izmena, beleske i flagovi. |
 | `app/api/settings.py` | 52 | Rute za podesavanja, ukljucujuci unos i proveru AI kljuca. |
 | `app/api/study.py` | 125 | Rute za ucenje: sesija, sledece pitanje, odgovor, preskakanje, rezime. |
 | `app/api/update.py` | 41 | Rute za samo-azuriranje aplikacije. |
@@ -88,8 +88,9 @@ aplikacija uopšte ovako izgleda.
 | `app/http_util.py` | 349 | Request/response sloj nad http.server. |
 | `app/netinfo.py` | 93 | Pod kojim adresama je aplikacija dostupna. |
 | `app/quiz/__init__.py` | 1 | Kviz: tipovi pitanja, ocenjivanje, raspored ponavljanja. |
+| `app/quiz/duplicates.py` | 144 | Prepoznavanje istog pitanja. |
 | `app/quiz/grading.py` | 350 | Ocenjivanje odgovora. |
-| `app/quiz/scheduler.py` | 284 | Raspored ponavljanja i izbor sledeceg pitanja. |
+| `app/quiz/scheduler.py` | 313 | Raspored ponavljanja i izbor sledeceg pitanja. |
 | `app/quiz/types.py` | 424 | Registar tipova pitanja. |
 | `app/router.py` | 107 | Minimalni ruter: sablon putanje -> funkcija. |
 | `app/server.py` | 259 | HTTP server nad standardnom bibliotekom. |
@@ -102,11 +103,11 @@ aplikacija uopšte ovako izgleda.
 | `app/services/materials.py` | 222 | Materijali: sta korisnik uploaduje i sta se od toga da procitati. |
 | `app/services/notes.py` | 116 | AI dopune materijala. |
 | `app/services/proposals.py` | 316 | Predlozi za nadogradnju same aplikacije. |
-| `app/services/questions.py` | 417 | Pitanja: upis iz generisanja, citanje, korisnikove beleske i flagovi. |
+| `app/services/questions.py` | 495 | Pitanja: upis iz generisanja, citanje, korisnikove beleske i flagovi. |
 | `app/services/settings_store.py` | 123 | Podesavanja: kljuc-vrednost u bazi, sa tipiziranim podrazumevanim vrednostima. |
 | `app/services/strategy.py` | 315 | Adaptivna strategija: kako sistem menja nacin na koji te ispituje. |
 | `app/services/study.py` | 661 | Sesija ucenja: izbor pitanja, ocenjivanje, objasnjenja. |
-| `app/services/updater.py` | 309 | Samo-azuriranje: provera nove verzije na GitHub-u i ugradnja preko sebe. |
+| `app/services/updater.py` | 475 | Samo-azuriranje: provera nove verzije na GitHub-u i ugradnja preko sebe. |
 | `app/translit.py` | 135 | Srpska latinica <-> cirilica. |
 
 Ulazne tačke: `run.py` (pokretanje), `run_tests.py` (testovi), `mapa.py` (ovaj fajl).
@@ -126,12 +127,12 @@ Ulazne tačke: `run.py` (pokretanje), `run_tests.py` (testovi), `mapa.py` (ovaj 
 | `web/js/views/category.js` | 568 | Ekrani unutar predmeta: pregled, materijali, generisanje pitanja. |
 | `web/js/views/exam.js` | 274 | Ispitna baza: fiksna lista pitanja sa fakulteta ulazi u aplikaciju DOSLOVNO. |
 | `web/js/views/guide.js` | 204 | Uputstvo unutar aplikacije. |
-| `web/js/views/library.js` | 448 | Pitanja, strategija i dopune - sve što se gleda van sesije učenja. |
+| `web/js/views/library.js` | 474 | Pitanja, strategija i dopune - sve što se gleda van sesije učenja. |
 | `web/js/views/network.js` | 98 | Kartica "otvori na telefonu". |
 | `web/js/views/proposals.js` | 229 | Predlozi za nadogradnju same aplikacije. |
 | `web/js/views/settings.js` | 353 | Podešavanja: AI ključ, modeli, agresivnost, govor, izgled, potrošnja. |
 | `web/js/views/study.js` | 566 | Ekran ucenja: podesavanje sesije, petlja pitanja, rezime. |
-| `web/js/views/update.js` | 143 | Kartica „Verzija i ažuriranje". |
+| `web/js/views/update.js` | 144 | Kartica „Verzija i ažuriranje". |
 
 Frontend je SPA bez frameworka: ES moduli, rutiranje preko `location.hash`, server servira samo statiku i JSON.
 
@@ -199,6 +200,7 @@ Frontend je SPA bez frameworka: ES moduli, rutiranje preko `location.hash`, serv
 | POST | `/api/categories/<int:category_id>/notes` | `create_note` |
 | POST | `/api/categories/<int:category_id>/notes/generate` | `generate_note` |
 | GET | `/api/categories/<int:category_id>/questions` | `list_questions` |
+| POST | `/api/categories/<int:category_id>/questions/dedupe` | `remove_duplicate_questions` |
 | GET | `/api/categories/<int:category_id>/runs` | `list_runs` |
 | GET | `/api/categories/<int:category_id>/stats` | `category_stats` |
 | GET | `/api/categories/<int:category_id>/strategy` | `read_strategy` |
@@ -255,7 +257,7 @@ Frontend je SPA bez frameworka: ES moduli, rutiranje preko `location.hash`, serv
 
 | Hoću da... | Diram |
 |---|---|
-| dodam novi tip pitanja | `app/quiz/types.py` (registar + validator), `app/quiz/grading.py` (ocenjivač), `web/js/render.js` (crtanje) — sva tri, uvek |
+| dodam novi tip pitanja | `app/quiz/types.py` (registar + validator), `app/quiz/grading.py` (ocenjivač), `web/js/render.js` (crtanje) — sva tri, uvek; plus tačan odgovor u `app/quiz/duplicates.py` |
 | promenim kako se bira sledeće pitanje | `app/quiz/scheduler.py` |
 | promenim šta se šalje modelu | `app/ai/prompts.py` |
 | promenim koliko dugo se čeka na AI ocenu | konstante `GRADE_*` na vrhu `app/services/study.py` |

@@ -316,14 +316,24 @@ dopunu baš za te tačke. Originalni materijali se ne diraju.
 
 ## 12. Ažuriranje
 
-**Podešavanja → Verzija i ažuriranje → Preuzmi i ažuriraj.**
+Dva načina, isti rezultat:
 
-Aplikacija sama proveri ima li novije verzije. Ako ima, preuzme je odmah — ali
-je **ugradi tek pri sledećem pokretanju**. Razlog je prozaičan: dok radi,
-aplikacija drži svoje fajlove otvorene i ne može da ih prepiše ispod sebe.
+| Način | Šta se desi |
+|---|---|
+| **Podešavanja → Verzija i ažuriranje → Preuzmi i ažuriraj** | Pripremi novu verziju; ugradi je **pri sledećem pokretanju**. Zatvori crni prozor i pokreni ponovo. |
+| **Dupli klik na `azuriraj.bat`** u folderu aplikacije | Ažurira **odmah**. Ako je aplikacija otvorena, posle toga je zatvori i pokreni ponovo. |
 
-Znači, tri koraka: klikni *Preuzmi*, zatvori crni prozor, pokreni ponovo.
-Pri pokretanju piše `Ugradjujem novu verziju...` i to je gotovo za sekundu.
+Nova verzija je ono što je poslednje poslato na GitHub (`main`) — ne mora niko
+da pravi „izdanje".
+
+- **Kopija iz git-a** (folder ima `.git`): ažurira se sa `git pull --ff-only`.
+  Ako u kodu imaš svoje izmene koje bi se pregazile, ažuriranje odbije i kaže
+  ti — ništa se ne briše.
+- **Instalacija iz `instaliraj.bat`**: preuzme se ZIP sa GitHub-a.
+
+> **Prvi put posle ove promene:** starija verzija nije umela da nađe novu, pa
+> je jednom ažuriraj ručno — u git kopiji `git pull`, a instalaciju iz
+> `instaliraj.bat` pokreni još jednom. Od tada radi sama.
 
 > Tvoja pitanja, materijali i napredak se **ne diraju**. Ažurira se samo kod
 > aplikacije. Folder `data/` ne dodiruje ni instalacija ni ažuriranje.

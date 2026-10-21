@@ -19,7 +19,7 @@ def download(request: Request) -> Response:
     url = (data.get("url") or "").strip()
     if not url:
         state = updater.check()
-        version, url = state.get("latest") or "", state.get("download") or ""
+        version, url = state.get("latest_sha") or "", state.get("download") or ""
     if not url:
         raise HttpError(400, "Nema adrese sa koje bi se skinula nova verzija.")
 
@@ -27,7 +27,7 @@ def download(request: Request) -> Response:
         def progress(done: int, total: int) -> None:
             job.progress(done, total, f"Preuzeto {done // 1024} KB")
 
-        job.log("Preuzimam novu verziju...")
+        job.log("Pripremam novu verziju...")
         info = updater.prepare(version, url, progress)
         job.log("Spremno. Ugradnja ide pri sledecem pokretanju.")
         return info
